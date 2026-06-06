@@ -117,12 +117,20 @@ def _format_competitor_context(competitor: Competitor) -> str:
         f"- {item.name}: {item.pricing or item.description}"
         for item in competitor.products[:5]
     ]
+    fin = competitor.financials or {}
+    fin_lines = [
+        f"- {key}: {value}"
+        for key, value in fin.items()
+        if key not in ("source", "source_url", "as_of") and value
+    ]
     return (
         f"Competitor: {competitor.name}\n"
         f"News ({len(competitor.news)} items):\n"
         + ("\n".join(news_lines) or "- none")
         + f"\nProducts ({len(competitor.products)} items):\n"
         + ("\n".join(product_lines) or "- none")
+        + f"\nFinancials:\n"
+        + ("\n".join(fin_lines) or "- none")
     )
 
 
@@ -186,10 +194,19 @@ async def generate_landscape_summary(
     if llm is None:
         return fallback
 
+    fin_summary_parts = []
+    for c in competitors:
+        fin = c.financials or {}
+        rev = fin.get("revenue") or fin.get("market_cap")
+        if rev:
+            fin_summary_parts.append(f"{c.name}: {rev}")
+    fin_text = "; ".join(fin_summary_parts) if fin_summary_parts else "Not available"
+
     prompt = (
         "Write a 2-3 sentence executive summary of this competitive landscape.\n"
         f"Target: {target_company or 'N/A'}\n"
         f"Competitors: {names}\n"
+        f"Financial highlights: {fin_text}\n"
         f"Market quadrants:\n{quadrant_text}\n"
     )
     try:

@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Send
 
 from agents.helpers import ensure_session_id, get_last_user_message, safe_emit_state
+from agents.financial_analyst import run_financial_analyst
 from agents.news_scout import run_news_scout
 from agents.product_tracker import run_product_tracker
 from agents.synthesis import run_synthesis
@@ -129,6 +130,7 @@ async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> d
 
     await run_news_scout(state, config, competitor_name=name)
     await run_product_tracker(state, config, competitor_name=name)
+    await run_financial_analyst(state, config, competitor_name=name)
     await run_synthesis(state, config, competitor_name=name)
 
     from state import find_competitor_index, get_competitors, parse_competitor

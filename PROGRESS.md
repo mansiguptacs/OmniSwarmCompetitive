@@ -9,7 +9,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ B4 complete | Parallel `Send` swarms, scoring metrics, LLM SWOT, branched real/hypothetical paths |
+| **Agents layer (backend)** | ✅ B4 complete + Financial Analyst | Parallel swarms (news + product + finance), scoring, LLM SWOT, branched paths |
 | **Real tools + LLM** | ✅ Live | Tavily search + `OPENAI_API_KEY` for classify/discover/SWOT; company-agnostic discovery |
 | **Observability (Weave)** | ✅ Enhanced | 7 trace scorers, per-competitor detail, memory metrics, coverage + SWOT completeness tracking |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
@@ -50,9 +50,11 @@
 ### Specialist agents
 - [x] `ccie/backend/agents/news_scout.py` — news fetch, sentiment, Redis persist
 - [x] `ccie/backend/agents/product_tracker.py` — product scrape per competitor
-- [x] `ccie/backend/agents/synthesis.py` — SWOT + landscape summary
+- [x] `ccie/backend/agents/financial_analyst.py` — revenue, funding, market cap, growth per competitor
+- [x] `ccie/backend/agents/synthesis.py` — SWOT + landscape summary (includes financial context)
 - [x] `ccie/backend/agents/helpers.py` — classify, discover, safe state emit
-- [x] Tests: `backend/tests/test_news_scout.py`, product/synthesis in `test_integration.py`
+- [x] `ccie/backend/tools/financial_data.py` — Tavily financial search + regex extraction + mock data
+- [x] Tests: `test_news_scout.py`, `test_financial.py`, product/synthesis in `test_integration.py`
 
 ### Orchestrator graph
 - [x] `ccie/backend/agents/orchestrator.py` — classify → enrich/parse → discover → parallel analyze → synthesize
@@ -101,9 +103,15 @@
 - [x] `OPENAI_API_KEY` — LLM classify, discover, SWOT, landscape summary (live verified)
 - [x] `ccie/.env.example` — documents Tavily, OpenAI, W&B, `CCIE_AUTO_SCORE` vars
 
+### News quality improvements
+- [x] Tavily `search_depth: "advanced"` for news queries
+- [x] Date extraction fallback — parses dates from title/content when `published_date` is empty
+- [x] Supports ISO (`2025-06-01`), named month (`January 15, 2025`), abbreviated (`Jun 3, 2025`)
+- [x] Tests: `test_date_extraction.py` (8 tests)
+
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **127 tests** — 127 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
+- [x] **140 tests** — 140 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
 
 ### Real tools (B2 — 2026-06-06)
 - [x] Tavily web search when `ENV=prod` + `TAVILY_API_KEY` — news + products (no scraping)
@@ -129,7 +137,7 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 127 passed, 3 skipped | ✅ Verified 2026-06-06 |
+| pytest green | 140 passed, 3 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
 | Real tools (Tavily) | Any company → relevant competitors + news | ✅ Verified (Stripe, Apple, PAN) |
 | OpenAI LLM path | classify + discover + SWOT via `gpt-4o-mini` | ✅ Verified 2026-06-06 |
@@ -202,7 +210,7 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | B4.3 | Compute `threat_level`, `market_size`, `market_overlap` from analysis | Populate fields for 3D encoding | ✅ |
 | B4.4 | Populate `market_quadrants` in landscape synthesis | leader/challenger/niche/visionary | ✅ |
 | B4.5 | Synthesis: LLM-generated SWOT + executive summary (replace template) | `agents/synthesis.py` | ✅ |
-| B4.6 | Add **Financial Analyst** agent subgraph | `agents/financial_analyst.py`, `tools/financial_data.py` | ⬜ |
+| B4.6 | Add **Financial Analyst** agent subgraph | `agents/financial_analyst.py`, `tools/financial_data.py` | ✅ |
 
 **Gate:** 3–5 competitors analyzed in parallel; state fields ready for 3D scene. ✅
 
@@ -319,14 +327,12 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 
 ## Deferred (Post-MVP)
 
-- Financial Analyst agent (unless pulled into Sprint D)
 - Redis Iris full MCP integration
-- Vector search + LangCache
 - Multi-session delta detection ("what changed since yesterday")
 - Weave leaderboard in demo UI
 - LangGraph `@tool` node binding (B2.5 — optional refactor)
 - Fix duplicate observability entries (wrap + landscape hook both score on `ainvoke`)
-- Improve news `published_at` extraction from Tavily (reduce guardrail false positives)
+- Improve news `published_at` extraction further (URL patterns, meta tags)
 
 ---
 
@@ -385,3 +391,10 @@ CCIE_AUTO_SCORE=1
 | 2026-06-06 | Merged P4 observability module (Weave scorers, guardrails, eval CLI) from teammate |
 | 2026-06-06 | B5 integrated — `@trace_node`, `wrap_graph_for_observability`, auto-score hook; Weave traces live |
 | 2026-06-06 | 87 tests green (backend + observability); git reconciled with remote `main` |
+| 2026-06-06 | Redis MemoryService integrated — agents use `get_memory_service()`, auto-index, vector search |
+| 2026-06-06 | Weave metrics enhanced — 7 trace scorers, per-competitor detail, memory + coverage metrics |
+| 2026-06-06 | Financial Analyst agent — revenue, funding, market cap, growth per competitor via Tavily |
+| 2026-06-06 | News quality — Tavily advanced search depth, date extraction fallback from content/title |
+| 2026-06-06 | Fix: Tavily sometimes returns strings instead of dicts — guard in web_search + financial_data |
+| 2026-06-06 | Graceful Redis startup — `verify_redis_on_startup(strict=False)` so app starts without Docker |
+| 2026-06-06 | 140 tests green (backend + observability + financial + date extraction) |

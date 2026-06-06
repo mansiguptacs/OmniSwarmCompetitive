@@ -1,4 +1,6 @@
 import logging
+import re
+from datetime import date
 
 from langchain_core.tools import tool
 
@@ -153,13 +155,50 @@ def _mock_search(query: str, max_results: int) -> list[NewsItem]:
     return MOCK_STRIPE_NEWS[:max_results]
 
 
-def _tavily_result_to_news_item(result: dict) -> NewsItem:
+_DATE_PATTERN = re.compile(
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}"
+    r"|"
+    r"\d{4}-\d{2}-\d{2}"
+)
+_MONTH_MAP = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _extract_date_from_text(text: str) -> str:
+    """Best-effort date extraction from content when published_date is missing."""
+    match = _DATE_PATTERN.search(text)
+    if not match:
+        return ""
+    raw = match.group()
+    if re.match(r"\d{4}-\d{2}-\d{2}", raw):
+        return raw
+    try:
+        parts = re.sub(r"[.,]", "", raw).split()
+        month_str = parts[0][:3].lower()
+        month = _MONTH_MAP.get(month_str, 1)
+        day = int(parts[1])
+        year = int(parts[2])
+        return date(year, month, day).isoformat()
+    except (ValueError, IndexError):
+        return ""
+
+
+def _tavily_result_to_news_item(result: dict | str) -> NewsItem:
+    if isinstance(result, str):
+        return NewsItem(title="Untitled", summary=result, published_at=_extract_date_from_text(result))
+    published = str(result.get("published_date", "") or "").strip()
+    if not published:
+        content = result.get("content", "") or result.get("raw_content", "") or ""
+        title = result.get("title", "") or ""
+        published = _extract_date_from_text(f"{title} {content}")
     return NewsItem(
         title=result.get("title", "") or "Untitled",
         url=result.get("url", ""),
         summary=result.get("content", "") or result.get("raw_content", "") or "",
         sentiment=0.0,
-        published_at=str(result.get("published_date", "") or ""),
+        published_at=published,
     )
 
 
@@ -188,12 +227,16 @@ class WebSearchTool:
         try:
             from langchain_community.tools.tavily_search import TavilySearchResults
 
-            search = TavilySearchResults(
-                max_results=max_results,
-                api_key=settings.TAVILY_API_KEY,
-                include_answer=False,
-                include_raw_content=False,
-            )
+            tavily_kwargs: dict = {
+                "max_results": max_results,
+                "api_key": settings.TAVILY_API_KEY,
+                "include_answer": False,
+                "include_raw_content": False,
+            }
+            if "news" in query.lower() or "latest" in query.lower():
+                tavily_kwargs["search_depth"] = "advanced"
+
+            search = TavilySearchResults(**tavily_kwargs)
             results = await search.ainvoke({"query": query})
             if not results:
                 return []
