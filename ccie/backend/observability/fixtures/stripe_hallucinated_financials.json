@@ -1,0 +1,23 @@
+{
+  "company": "Stripe",
+  "competitors": [
+    {
+      "name": "PayPal",
+      "news": [
+        {
+          "title": "PayPal Q1 earnings",
+          "summary": "PayPal reports quarterly results.",
+          "published_at": "2026-05-01",
+          "sentiment": 0.4
+        }
+      ],
+      "products": [],
+      "financials": {
+        "revenue": "$78.654B",
+        "market_cap": "$412.3B",
+        "growth_rate": "47.2%",
+        "funding_total": "$999.999M"
+      }
+    }
+  ]
+}

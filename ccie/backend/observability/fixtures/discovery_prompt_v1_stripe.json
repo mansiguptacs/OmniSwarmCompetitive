@@ -1,0 +1,53 @@
+{
+  "prompt_variant": "v1_baseline",
+  "agent_role": "discovery",
+  "target_company": "Stripe",
+  "is_hypothetical": false,
+  "competitors": [
+    {
+      "name": "PayPal",
+      "description": "Competitor to Stripe",
+      "status": "complete",
+      "news": [
+        {
+          "title": "PayPal launches new merchant tools",
+          "summary": "PayPal expands SMB payment offerings for Stripe competitors.",
+          "published_at": "2026-05-02",
+          "sentiment": 0.4
+        }
+      ],
+      "products": [{"name": "Checkout", "description": "PayPal checkout", "pricing": "2.99%"}],
+      "financials": {}
+    },
+    {
+      "name": "Adyen",
+      "description": "Competitor to Stripe",
+      "status": "complete",
+      "news": [
+        {
+          "title": "Adyen reports strong enterprise growth",
+          "summary": "Adyen wins large enterprise payment deals vs Stripe.",
+          "published_at": "2026-05-03",
+          "sentiment": 0.7
+        }
+      ],
+      "products": [{"name": "Unified Commerce", "description": "Enterprise platform", "pricing": "Custom"}],
+      "financials": {}
+    },
+    {
+      "name": "Square",
+      "description": "Competitor to Stripe",
+      "status": "complete",
+      "news": [
+        {
+          "title": "Square introduces new POS features",
+          "summary": "Square enhances in-person payments competing with Stripe.",
+          "published_at": "2026-05-04",
+          "sentiment": 0.5
+        }
+      ],
+      "products": [{"name": "Square POS", "description": "POS hardware", "pricing": "2.6%"}],
+      "financials": {}
+    }
+  ]
+}

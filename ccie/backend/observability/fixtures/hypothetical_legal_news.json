@@ -1,0 +1,28 @@
+{
+  "company": "AI Legal Document Review Platform",
+  "query": "AI legal document review competitors",
+  "is_hypothetical": true,
+  "news_items": [
+    {
+      "title": "Harvey AI raises Series B for legal automation",
+      "url": "https://example.com/harvey-funding",
+      "summary": "Harvey AI expands AI-powered legal workflows for law firms.",
+      "sentiment": 0.7,
+      "published_at": "2026-04-20"
+    },
+    {
+      "title": "Luminance launches contract review assistant",
+      "url": "https://example.com/luminance-launch",
+      "summary": "Luminance targets mid-size law firms with AI document review.",
+      "sentiment": 0.5,
+      "published_at": "2026-05-05"
+    },
+    {
+      "title": "Kira Systems integrates generative AI",
+      "url": "https://example.com/kira-ai",
+      "summary": "Kira Systems adds LLM features to due diligence workflows.",
+      "sentiment": 0.4,
+      "published_at": "2026-05-12"
+    }
+  ]
+}

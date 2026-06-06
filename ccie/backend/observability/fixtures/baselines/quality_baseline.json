@@ -1,0 +1,7 @@
+{
+  "min_avg_freshness": 0.0,
+  "min_avg_relevance": 0.8,
+  "max_violation_count": 3,
+  "min_competitor_count": 2,
+  "note": "Baseline for mock-data era; tighten when real Tavily news is live"
+}

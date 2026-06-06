@@ -1,0 +1,27 @@
+{
+  "company": "Stripe",
+  "query": "Stripe latest news",
+  "news_items": [
+    {
+      "title": "Stripe expands global payments",
+      "url": "https://example.com/stripe-global",
+      "summary": "Stripe launches new cross-border payment features.",
+      "sentiment": 0.6,
+      "published_at": "2023-01-01"
+    },
+    {
+      "title": "Stripe partners with major banks",
+      "url": "https://example.com/stripe-banks",
+      "summary": "Stripe announces banking partnerships in Europe.",
+      "sentiment": 0.5,
+      "published_at": "2023-06-10"
+    },
+    {
+      "title": "Stripe faces regulatory scrutiny",
+      "url": "https://example.com/stripe-regulation",
+      "summary": "Regulators review Stripe compliance updates.",
+      "sentiment": -0.1,
+      "published_at": "2024-02-15"
+    }
+  ]
+}

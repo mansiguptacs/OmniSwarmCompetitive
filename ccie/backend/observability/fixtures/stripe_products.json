@@ -1,0 +1,15 @@
+{
+  "company": "Stripe",
+  "products": [
+    {
+      "name": "Payments API",
+      "description": "Online payment processing for internet businesses.",
+      "pricing": "2.9% + 30¢ per transaction"
+    },
+    {
+      "name": "Billing",
+      "description": "Subscription and invoicing management.",
+      "pricing": "0.5% on recurring charges"
+    }
+  ]
+}
