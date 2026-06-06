@@ -1,6 +1,6 @@
 # CCIE — Progress Tracker
 
-> Last updated: **2026-06-06**  
+> Last updated: **2026-06-06** (evening)  
 > Reference: [`implementation_plan.md`](implementation_plan.md)
 
 ---
@@ -9,12 +9,15 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ B4 complete | Parallel swarms, scoring metrics, LLM SWOT, branched real/hypothetical paths |
+| **Agents layer (backend)** | ✅ B4 complete | Parallel `Send` swarms, scoring metrics, LLM SWOT, branched real/hypothetical paths |
+| **Real tools + LLM** | ✅ Live | Tavily search + `OPENAI_API_KEY` for classify/discover/SWOT; company-agnostic discovery |
+| **Observability (Weave)** | ✅ Integrated | P4 module merged; `@trace_node`, auto-score, guardrails wired into server + playground |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
-| **Playground UI (dev testing)** | ✅ Working | `ccie/playground/` — chat + `useCoAgent` state panel verified |
+| **Playground UI (dev testing)** | ✅ Working | Multi-turn chat, real competitors per company, Observability activity feed |
 | **Integration (chat UI)** | 🟡 Playground only | Production `ccie/frontend/` still owned by frontend teammate |
-| **3D War Room** | ⬜ Not started | Depends on shared state flowing to frontend |
-| **MVP Phase** | **Phase 2 in progress** | Backend + playground E2E working; prod frontend + 3D still out |
+| **Redis (live persistence)** | 🟡 In progress | Fakeredis in tests; live Redis owned by another teammate (B3) |
+| **3D War Room** | ⬜ Not started | `threat_level`, `market_size`, `market_overlap` ready in state for encoding |
+| **MVP Phase** | **Phase 2 in progress** | Backend + playground + Weave E2E working; prod frontend + 3D still out |
 
 ---
 
@@ -52,11 +55,13 @@
 - [x] Tests: `backend/tests/test_news_scout.py`, product/synthesis in `test_integration.py`
 
 ### Orchestrator graph
-- [x] `ccie/backend/agents/orchestrator.py` — classify → discover → analyze → synthesize
-- [x] `ccie/backend/agents/graph.py` — compiles full orchestrator + echo smoke graph
-- [x] Real company path (`Analyze Stripe` → PayPal, Adyen, Square)
+- [x] `ccie/backend/agents/orchestrator.py` — classify → enrich/parse → discover → parallel analyze → synthesize
+- [x] `ccie/backend/agents/graph.py` — branched real/hypothetical paths + LangGraph `Send` fan-out
+- [x] `ccie/backend/agents/scoring.py` — `threat_level`, `market_size`, `market_overlap`, `market_quadrants`
+- [x] State reset on new analysis (fixes stale competitors on same CopilotKit thread)
+- [x] Real company path (`Analyze Stripe`, `Analyze Apple`, `Analyze Palo Alto Networks`)
 - [x] Hypothetical path (long description → legal-tech competitors)
-- [x] Tests: `backend/tests/test_orchestrator.py` (5 tests)
+- [x] Tests: `backend/tests/test_orchestrator.py` (6 tests), `test_scoring.py`, `test_discovery.py`
 
 ### Redis memory
 - [x] `ccie/backend/memory/schemas.py` — `CompanyRecord`, `StoredNewsItem`
@@ -64,12 +69,25 @@
 - [x] `ccie/backend/memory/factory.py` — injectable client for tests
 - [x] Tests: `backend/tests/test_redis_client.py` (3 tests)
 
-### Observability
-- [x] `ccie/backend/observability/weave_config.py` — W&B Weave init (`WEAVE_DISABLED=1` to skip)
+### Observability (P4 module + integration)
+- [x] `ccie/backend/observability/` — scorers, guardrails, eval CLI, fixtures (teammate P4)
+- [x] `weave_config.py` — W&B Weave init (`WEAVE_DISABLED=1` to skip)
+- [x] `main.py` — `init_weave()` + `wrap_graph_for_observability()`
+- [x] `@trace_node` on all orchestrator nodes
+- [x] Post-run hook in `landscape_synthesis_node` — auto-score + `Observability` activity feed
+- [x] `GET /health` reports `weave` + `auto_score` status
+- [x] Tests: `observability/tests/` (45 tests) + `backend/tests/test_scorers.py`
+- [x] Live verified — traces at [ccie-agents Weave UI](https://wandb.ai/mohitmanoj-barade-san-jose-state-university/ccie-agents/weave)
+
+### Discovery & LLM (2026-06-06)
+- [x] `llm/discovery.py` — extract competitors from Tavily search when LLM unavailable
+- [x] Removed hardcoded PayPal/Adyen/Square default for unknown companies
+- [x] `OPENAI_API_KEY` — LLM classify, discover, SWOT, landscape summary (live verified)
+- [x] `ccie/.env.example` — documents Tavily, OpenAI, W&B, `CCIE_AUTO_SCORE` vars
 
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **37 tests** — 37 passed, 2 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests -v`)
+- [x] **87 tests** — 87 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
 
 ### Real tools (B2 — 2026-06-06)
 - [x] Tavily web search when `ENV=prod` + `TAVILY_API_KEY` — news + products (no scraping)
@@ -95,19 +113,24 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 37 passed, 3 skipped | ✅ Verified 2026-06-06 |
+| pytest green | 87 passed, 3 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
-| Chat UI shows agent output | User types "Stripe" → chat response | ✅ Playground verified 2026-06-06 |
-| Shared state → UI | `useCoAgent` renders competitors | ✅ Playground state panel (phase, activity, competitors) |
+| Real tools (Tavily) | Any company → relevant competitors + news | ✅ Verified (Stripe, Apple, PAN) |
+| OpenAI LLM path | classify + discover + SWOT via `gpt-4o-mini` | ✅ Verified 2026-06-06 |
+| Weave tracing | `GET /health` → `weave: true`; traces in W&B dashboard | ✅ Verified 2026-06-06 |
+| Auto-score on run | `Observability` entries in activity feed | ✅ Verified (`CCIE_AUTO_SCORE=1`) |
+| Chat UI shows agent output | User types "Analyze Stripe" → chat response | ✅ Playground verified |
+| Shared state → UI | `useCoAgent` renders competitors + activity | ✅ Playground state panel |
+| Multi-turn chat | Second analysis replaces (not merges) competitors | ✅ Fixed 2026-06-06 |
 | 3D buildings on discovery | R3F scene updates from state | ⬜ Not yet |
 
 ---
 
 ## Backend & Agent Harness — Next Steps
 
-> **Current harness:** mock tools + heuristic classifier/discovery + template SWOT.  
-> **Works today:** full graph invoke via pytest, CopilotKit endpoint, fakeredis.  
-> **Does not yet use:** OpenAI LLM, real scrape, live Redis, Weave scorers, parallel swarms.
+> **Works today:** Tavily + OpenAI live path, parallel swarms, Weave tracing + auto-score, playground E2E, 87 tests green.  
+> **In progress:** B3 live Redis (another teammate).  
+> **Not yet:** production frontend, 3D War Room, Financial Analyst, CI pipeline.
 
 ### B1 — Agent harness foundation (do first)
 Wire a proper LLM + structured-output layer so agents stop relying on hardcoded maps.
@@ -121,7 +144,7 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | B1.5 | Emit competitor one-by-one during discovery (state emit per competitor) | `orchestrator.py` | ✅ |
 | B1.6 | Tests: mock LLM paths + one opt-in live LLM test (`INTEGRATION=1`) | `tests/test_llm_client.py` | ✅ |
 
-**Gate:** classifier + discovery use LLM; tests still green with mocks.
+**Gate:** classifier + discovery use LLM; tests still green with mocks. ✅
 
 ---
 
@@ -162,19 +185,19 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | B4.5 | Synthesis: LLM-generated SWOT + executive summary (replace template) | `agents/synthesis.py` | ✅ |
 | B4.6 | Add **Financial Analyst** agent subgraph | `agents/financial_analyst.py`, `tools/financial_data.py` | ⬜ |
 
-**Gate:** 3–5 competitors analyzed in parallel; state fields ready for 3D scene.
+**Gate:** 3–5 competitors analyzed in parallel; state fields ready for 3D scene. ✅
 
 ---
 
 ### B5 — Observability (Weave)
 | # | Task | Files / notes | Done |
 |---|---|---|---|
-| B5.1 | Enable Weave in dev (`WANDB_API_KEY`, remove `WEAVE_DISABLED`) | Verify traces in W&B dashboard | 🟡 wired — set keys in `.env` |
+| B5.1 | Enable Weave in dev (`WANDB_API_KEY`, remove `WEAVE_DISABLED`) | Traces live in W&B dashboard | ✅ |
 | B5.2 | Decorate graph nodes with `@trace_node` | `orchestrator.py` — all orchestrator nodes | ✅ |
 | B5.3 | Custom scorers: freshness, relevance, accuracy | `observability/scorers.py` + P2 hook in `landscape_synthesis_node` | ✅ |
 | B5.4 | Guardrails for hallucinated financial figures / stale news | `observability/guardrails.py` via `CCIE_AUTO_SCORE=1` | ✅ |
 
-**Gate:** trace visible for full Stripe run; scorers run on agent outputs.
+**Gate:** trace visible for full Stripe run; scorers run on agent outputs. ✅ Verified 2026-06-06.
 
 ---
 
@@ -247,9 +270,9 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | # | Task | Owner track | Done |
 |---|---|---|---|
 | C1 | Start Redis locally (`docker compose up -d`) and verify live persistence | Infra | ⬜ |
-| C2 | Replace heuristic classifier/discovery with LLM structured output | Agents | ⬜ |
-| C3 | Enable real web search (`TAVILY_API_KEY`, `ENV=prod`) | Agents | ⬜ |
-| C4 | Weave scorers — freshness, relevance on agent outputs | Observability | ⬜ |
+| C2 | Replace heuristic classifier/discovery with LLM structured output | Agents | ✅ |
+| C3 | Enable real web search (`TAVILY_API_KEY`, `ENV=prod`) | Agents | ✅ |
+| C4 | Weave scorers — freshness, relevance on agent outputs | Observability | ✅ |
 | C5 | Redis Iris Context Retriever schemas + MCP tools (stretch) | Infra | ⬜ |
 | C6 | LangCache for repeated queries (stretch) | Infra | ⬜ |
 
@@ -282,26 +305,47 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 - Vector search + LangCache
 - Multi-session delta detection ("what changed since yesterday")
 - Weave leaderboard in demo UI
-- Parallel per-competitor LangGraph `Send` fan-out (currently sequential)
+- LangGraph `@tool` node binding (B2.5 — optional refactor)
+- Fix duplicate observability entries (wrap + landscape hook both score on `ainvoke`)
+- Improve news `published_at` extraction from Tavily (reduce guardrail false positives)
 
 ---
 
 ## Quick Commands
 
 ```bash
-# Tests
+# Tests (backend + observability)
 cd ccie && source .venv/bin/activate
-WEAVE_DISABLED=1 ENV=test pytest backend/tests -v
+WEAVE_DISABLED=1 ENV=test USE_MOCK_TOOLS=1 pytest backend/tests observability/tests -v
 
-# Backend
-cd ccie/backend && WEAVE_DISABLED=1 uvicorn main:app --reload --port 8000
+# Backend (loads ccie/.env — Tavily, OpenAI, Weave)
+cd ccie/backend && source ../.venv/bin/activate
+uvicorn main:app --reload --port 8000
 
-# Redis
+# Playground
+cd ccie/playground && npm run dev
+
+# Redis (B3 — when ready)
 cd ccie && docker compose up -d
 
-# Health
-curl http://localhost:8000/health
-curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
+# Health + Weave status
+curl http://127.0.0.1:8000/health
+
+# Manual traced run
+cd ccie/backend
+python -m observability.trace_runner --scenario stripe --score --apply-scorers
+```
+
+### Required `ccie/.env` for full demo
+
+```bash
+TAVILY_API_KEY=...
+OPENAI_API_KEY=...
+ENV=prod
+USE_MOCK_TOOLS=0
+WANDB_API_KEY=...
+CCIE_AUTO_SCORE=1
+# do NOT set WEAVE_DISABLED=1 when tracing
 ```
 
 ---
@@ -314,4 +358,11 @@ curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
 | 2026-06-06 | CopilotKit registry page verified — `ccie_agent` live at `:8000/api/copilotkit/` |
 | 2026-06-06 | Created this progress tracker |
 | 2026-06-06 | Added `ccie/playground/` — dev-only CopilotKit UI for backend testing (`ccie/frontend/` reserved) |
-| 2026-06-06 | B4 complete — parallel Send swarms, competitor scoring, market quadrants, LLM SWOT, branched real/hypothetical graph; 37 tests green |
+| 2026-06-06 | B2 complete — Tavily search-only tools; live scrape removed |
+| 2026-06-06 | B4 complete — parallel Send swarms, competitor scoring, market quadrants, LLM SWOT, branched graph |
+| 2026-06-06 | Discovery fix — search-based competitor extraction; removed Stripe-only hardcoded defaults |
+| 2026-06-06 | State reset on new analysis — fixes stale competitors in multi-turn playground chat |
+| 2026-06-06 | OpenAI integration verified — classify/discover/SWOT via `gpt-4o-mini` |
+| 2026-06-06 | Merged P4 observability module (Weave scorers, guardrails, eval CLI) from teammate |
+| 2026-06-06 | B5 integrated — `@trace_node`, `wrap_graph_for_observability`, auto-score hook; Weave traces live |
+| 2026-06-06 | 87 tests green (backend + observability); git reconciled with remote `main` |
