@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from copilotkit import CopilotKitRemoteEndpoint, LangGraphAGUIAgent
-from copilotkit.integrations.fastapi import add_fastapi_endpoint
+from ag_ui_langgraph import add_langgraph_fastapi_endpoint
+from copilotkit import LangGraphAGUIAgent
 
 from agents.graph import compile_graph
 from observability.weave_config import init_weave
@@ -23,8 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-sdk = CopilotKitRemoteEndpoint(agents=[agent])
-add_fastapi_endpoint(app, sdk, "/api/copilotkit")
+add_langgraph_fastapi_endpoint(app, agent, "/api/copilotkit/")
 
 
 @app.get("/health")

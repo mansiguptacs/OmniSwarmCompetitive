@@ -42,4 +42,4 @@ Open **http://localhost:3000**
 
 | Variable | Default |
 |---|---|
-| `CCIE_BACKEND_URL` | `http://localhost:8000/api/copilotkit` |
+| `CCIE_BACKEND_URL` | `http://127.0.0.1:8000/api/copilotkit/` |

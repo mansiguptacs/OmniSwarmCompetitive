@@ -11,10 +11,10 @@
 |---|---|---|
 | **Agents layer (backend)** | ✅ B1 complete | LLM harness + heuristics; classifier/discovery via `llm/client.py` |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
-| **Playground UI (dev testing)** | ✅ Scaffolded | `ccie/playground/` — minimal CopilotKit test harness |
-| **Integration (chat UI)** | ⬜ Blocked on frontend | Backend ready for `useCoAgent({ name: "ccie_agent" })` |
+| **Playground UI (dev testing)** | ✅ Working | `ccie/playground/` — chat + `useCoAgent` state panel verified |
+| **Integration (chat UI)** | 🟡 Playground only | Production `ccie/frontend/` still owned by frontend teammate |
 | **3D War Room** | ⬜ Not started | Depends on shared state flowing to frontend |
-| **MVP Phase** | **Between Phase 1 & 2** | Backend exceeds Phase 1 scope; chat UI still missing |
+| **MVP Phase** | **Phase 2 in progress** | Backend + playground E2E working; prod frontend + 3D still out |
 
 ---
 
@@ -32,9 +32,9 @@
 - [x] Tests: `backend/tests/test_state.py` (5 tests)
 
 ### FastAPI + CopilotKit bridge
-- [x] `ccie/backend/main.py` — `LangGraphAGUIAgent` as `ccie_agent` at `/api/copilotkit`
+- [x] `ccie/backend/main.py` — `LangGraphAGUIAgent` as `ccie_agent` at `/api/copilotkit/`
+- [x] AG-UI SSE endpoint via `add_langgraph_fastapi_endpoint` (replaces legacy `add_fastapi_endpoint`)
 - [x] `GET /health` endpoint
-- [x] CopilotKit registry page verified in browser (`ccie_agent`, `langgraph_agui`)
 - [x] Tests: `backend/tests/test_graph_smoke.py` (echo graph + health)
 
 ### Tools (mock-first)
@@ -93,8 +93,8 @@
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
 | pytest green | 34 passed, 1 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
-| Chat UI shows agent output | User types "Stripe" → chat response | ⬜ Not yet |
-| Shared state → UI | `useCoAgent` renders competitors | ⬜ Not yet |
+| Chat UI shows agent output | User types "Stripe" → chat response | ✅ Playground verified 2026-06-06 |
+| Shared state → UI | `useCoAgent` renders competitors | ✅ Playground state panel (phase, activity, competitors) |
 | 3D buildings on discovery | R3F scene updates from state | ⬜ Not yet |
 
 ---
@@ -177,7 +177,7 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 ### B6 — CopilotKit / API harness
 | # | Task | Files / notes | Done |
 |---|---|---|---|
-| B6.1 | Verify full agent run via CopilotKit HTTP (not just registry page) | POST to `/api/copilotkit/agent/ccie_agent` | ⬜ |
+| B6.1 | Verify full agent run via CopilotKit HTTP (not just registry page) | AG-UI SSE at `POST /api/copilotkit/`; playground proxy verified | ✅ |
 | B6.2 | Add `CopilotKitMiddleware` if needed for frontend tool calls | `main.py` / graph compile | ⬜ |
 | B6.3 | Register CopilotKit Actions (e.g. `render_building`) for GenUI | `main.py` | ⬜ |
 | B6.4 | `.env.example` with all backend env vars documented | repo root or `ccie/` | ⬜ |
@@ -200,7 +200,8 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 
 ### Playground UI (backend/agent testing — not production frontend)
 - [x] `ccie/playground/` — minimal Next.js + CopilotKit chat + `useCoAgent` state panel
-- [ ] `npm install && npm run dev` — verify chat with backend on `:8000`
+- [x] `app/api/copilotkit/route.ts` — `LangGraphHttpAgent` → `http://127.0.0.1:8000/api/copilotkit/`
+- [x] E2E verified — "Analyze Stripe" streams agent run + live shared state
 
 ### Sprint A — Production frontend (frontend teammate)
 **Goal:** User types "Analyze Stripe" → agent runs → result shows in chat.
@@ -309,3 +310,4 @@ curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
 | 2026-06-06 | CopilotKit registry page verified — `ccie_agent` live at `:8000/api/copilotkit/` |
 | 2026-06-06 | Created this progress tracker |
 | 2026-06-06 | Added `ccie/playground/` — dev-only CopilotKit UI for backend testing (`ccie/frontend/` reserved) |
+| 2026-06-06 | Playground E2E working — AG-UI backend endpoint + `LangGraphHttpAgent` proxy; B6.1 gate passed |
