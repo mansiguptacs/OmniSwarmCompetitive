@@ -230,8 +230,12 @@ ccie/
 │   │   └── financial_data.py        # Financial data fetcher
 │   ├── memory/
 │   │   └── redis_client.py          # Redis Iris integration
-│   ├── observability/
-│   │   └── weave_config.py          # W&B Weave setup + scorers
+│   ├── observability/                 # 👤 Person 4 owns this entire folder
+│   │   ├── weave_config.py            # W&B Weave init + LangGraph auto-tracing
+│   │   ├── scorers.py                 # Freshness, relevance, accuracy scorers
+│   │   ├── guardrails.py              # Hallucination + stale-data guardrails
+│   │   ├── decorators.py              # @weave.op wrappers for graph nodes
+│   │   └── eval_harness.py            # Leaderboard + prompt comparison runs
 │   └── state.py                     # Shared CopilotKit state schema
 │
 ├── docker-compose.yml               # Redis
@@ -282,7 +286,7 @@ ccie/
 - [ ] FastAPI + CopilotKit SDK + LangGraph (backend)
 - [ ] Single agent: News Scout (web search → returns news for a company)
 - [ ] Redis basic setup (store agent output as JSON)
-- [ ] W&B Weave initialized (auto-tracing on)
+- [ ] W&B Weave initialized (auto-tracing on) — **P4**
 - [ ] CopilotKit chat showing agent results as text
 
 ### Phase 2: Intelligence (Day 1, Hours 4-10) 🧠
@@ -292,7 +296,7 @@ ccie/
 - [ ] Competitor discovery agent (finds top 3-5 competitors)
 - [ ] Product Tracker agent
 - [ ] Redis Iris: Agent Memory + Context Retriever schemas
-- [ ] Weave scorers (freshness, relevance)
+- [ ] Weave scorers (freshness, relevance) — **P4**
 - [ ] GenUI components: CompetitorCard, basic data display
 - [ ] Shared state flowing: agent discovers competitor → UI knows
 
@@ -304,27 +308,38 @@ ccie/
 - [ ] Click building → detail panel (GenUI components: SWOT, news, features)
 - [ ] Financial Analyst agent (stretch)
 - [ ] Synthesis agent: cross-competitor analysis
-- [ ] Weave leaderboard visible in demo
+- [ ] Weave leaderboard visible in demo — **P4**
 - [ ] Vector search: "Which competitor is strongest in X?"
 - [ ] Demo flow polish, edge cases, presentation
 
 ---
 
-## 3-Person Team Distribution
+## 4-Person Team Distribution
 
-### 👤 Person 1: "Agent Architect" — LangGraph + W&B Weave
-*Owns: All Python agent code, LangGraph graph design, Weave integration*
+| Person | Role | Owns | Independent from |
+|---|---|---|---|
+| **P1** | Agent Architect | LangGraph, agents, tools | P4 (Weave) |
+| **P2** | Memory & Infra | Redis Iris, FastAPI, state schema | P3 (frontend) |
+| **P3** | Frontend Wizard | Next.js, CopilotKit, 3D war room | P1 (uses mock state Day 1) |
+| **P4** | Observability Engineer | W&B Weave, scorers, guardrails, evals | P1 (uses fixtures Day 1) |
+
+---
+
+### 👤 Person 1: "Agent Architect" — LangGraph + Specialist Agents
+*Owns: All Python agent code, LangGraph graph design, tools, orchestration*
 
 | Day 1 | Day 2 |
 |---|---|
 | LangGraph orchestrator scaffold | Financial Analyst agent |
 | Company classifier node (real vs hypothetical) | Synthesis agent (cross-competitor) |
 | News Scout agent + web search tools | Multi-competitor parallel swarms |
-| Product Tracker agent + scraping tools | Weave scorers + leaderboard |
-| Competitor discovery agent | Prompt optimization using Weave traces |
-| Weave auto-tracing setup | Bug fixes, demo polish |
+| Product Tracker agent + scraping tools | Competitor discovery prompt tuning |
+| Competitor discovery agent | Bug fixes, demo polish |
+| Expose stable node entry points for P4 tracing hooks | Coordinate with P4 on scorer feedback loops |
 
-**Deliverables:** Working agent swarm, Weave dashboard with traces + evals
+**Deliverables:** Working agent swarm, stable `CCIEState` updates, node functions P4 can decorate
+
+**Does NOT own:** Weave init, scorers, guardrails, leaderboard (→ P4)
 
 ---
 
@@ -360,6 +375,53 @@ ccie/
 
 ---
 
+### 👤 Person 4: "Observability Engineer" — W&B Weave (Independent Track)
+*Owns: Entire `backend/observability/` folder — tracing, scorers, guardrails, evals, demo dashboard*
+
+> [!TIP]
+> **P4 works independently from Hour 1.** Agent code already calls `init_weave()` in `main.py`. P4 builds scorers and eval harness against **fixture outputs** (see contract below) while P1 builds agents. Integration is a thin `@weave.op()` pass on P1's nodes at Hour 7 — not a blocker.
+
+| Day 1 | Day 2 |
+|---|---|
+| Enable Weave in dev (`WANDB_API_KEY`, verify dashboard) | Guardrails: hallucinated financials, stale news |
+| LangGraph auto-tracing verification (orchestrator + agents) | Leaderboard: compare prompt configs per agent role |
+| `@weave.op()` decorators on graph nodes (with P1 at Hour 7) | Eval harness: batch runs on Stripe + hypothetical fixtures |
+| Custom scorers: freshness, relevance, accuracy | Prompt optimization loop using Weave traces |
+| Unit tests for scorers against fixture agent outputs | Demo: Weave dashboard URL + 1-slide quality metrics |
+| Document scorer API + sample traces in README | Integrate scorer results into agent activity feed (stretch) |
+
+**Deliverables:** Weave dashboard with full traces, working scorers, guardrails, leaderboard for demo
+
+**Independence contract — P4 does NOT wait on P1:**
+
+| Artifact | Location | Purpose |
+|---|---|---|
+| Fixture agent outputs | `observability/fixtures/stripe_news.json`, `stripe_products.json`, etc. | Develop scorers without live agents |
+| Scorer interface | `observability/scorers.py` → `score_freshness(output)`, `score_relevance(output, query)` | Pure functions; testable in isolation |
+| Decorator shim | `observability/decorators.py` → `trace_node(fn)` | P1 wraps nodes in one line at integration |
+| Eval harness CLI | `python -m observability.eval_harness --fixture stripe` | Run scorers + publish to Weave leaderboard |
+
+**Integration touchpoints with P1 (minimal):**
+
+```python
+# P1's node (orchestrator.py) — one-line hook at Hour 7 sync
+from observability.decorators import trace_node
+
+@trace_node(name="classify_company")
+def classify_company(state: CCIEState) -> CCIEState:
+    ...
+```
+
+```python
+# P4's scorer — works on any agent output dict, no graph dependency
+# observability/scorers.py
+def score_freshness(news_items: list[dict]) -> float:
+    """Returns 0.0–1.0 based on recency of news timestamps."""
+    ...
+```
+
+---
+
 ## Integration Checkpoints
 
 > [!IMPORTANT]
@@ -367,11 +429,14 @@ ccie/
 
 | When | What | Who |
 |---|---|---|
-| **Day 1, Hour 4** | Agent output → shows in CopilotKit chat | All 3 |
+| **Day 1, Hour 2** | Weave dashboard shows traces from a single News Scout run | P4 (solo — uses existing graph) |
+| **Day 1, Hour 4** | Agent output → shows in CopilotKit chat | P1 + P2 + P3 |
 | **Day 1, Hour 7** | Agent output → stored in Redis → queryable | P1 + P2 |
+| **Day 1, Hour 7** | `@trace_node` decorators on orchestrator + agent nodes | P1 + P4 (15 min sync) |
 | **Day 1, Hour 9** | Shared state → GenUI components render agent data | P1 + P3 |
-| **Day 2, Hour 3** | 3D buildings appear when agents discover competitors | All 3 |
-| **Day 2, Hour 6** | Full demo dry run | All 3 |
+| **Day 1, Hour 9** | Scorers run on live agent outputs in Weave | P4 (solo after Hour 7 sync) |
+| **Day 2, Hour 3** | 3D buildings appear when agents discover competitors | All 4 |
+| **Day 2, Hour 6** | Full demo dry run (include Weave quality slide) | All 4 |
 
 ---
 
@@ -439,6 +504,8 @@ const { state } = useCoAgent<CCIEState>({ name: "ccie_agent" });
 | Hypothetical company analysis is vague | Pre-build a few industry templates; use structured prompts for market inference | P1 |
 | Redis Iris setup complexity | Start with basic Redis (dict/JSON), progressively add Iris features (Memory → Retriever → Search) | P2 |
 | Agent swarm overwhelms API limits | LangCache + rate limiting + pre-seeded demo data for safe demo flow | P2 |
+| Weave blocks agent development | P4 owns `observability/` entirely; P1 only adds one-line `@trace_node` at Hour 7 | P4 |
+| Scorers can't run until agents exist | P4 builds against fixture JSON in `observability/fixtures/` from Hour 1 | P4 |
 | Integration at checkpoints fails | Each person builds with mock data first; integration swaps mocks for real | All |
 
 ---

@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage
 
 from agents.graph import compile_graph
 from agents.helpers import classify_input, discover_competitors
+from llm.heuristic import heuristic_classify, heuristic_discover
 from state import default_ccie_state
 
 
@@ -40,6 +41,10 @@ async def test_orchestrator_phase_transitions():
     assert result["is_hypothetical"] is False
     competitor_names = [c["name"] for c in result["competitors"]]
     assert "PayPal" in competitor_names
+    discovery_events = [
+        e for e in result["agent_activity"] if "Discovered competitor" in e["status"]
+    ]
+    assert len(discovery_events) >= 3
 
 
 @pytest.mark.asyncio

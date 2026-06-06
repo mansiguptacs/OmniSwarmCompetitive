@@ -59,13 +59,42 @@ MOCK_COMPETITOR_NEWS = {
 }
 
 
+def _mock_competitor_discovery_results(query_lower: str, max_results: int) -> list[NewsItem]:
+    discovery_map = {
+        "stripe": ["PayPal", "Adyen", "Square"],
+        "paypal": ["Stripe", "Adyen", "Square"],
+        "legal": ["Kira Systems", "Luminance", "Harvey AI"],
+    }
+    for key, names in discovery_map.items():
+        if key in query_lower:
+            return [
+                NewsItem(
+                    title=f"{name} competes in the same market",
+                    url=f"https://example.com/{key}-{name.lower().replace(' ', '-')}",
+                    summary=f"{name} is a key competitor in the {key} space.",
+                    sentiment=0.0,
+                )
+                for name in names[:max_results]
+            ]
+    default_names = ["PayPal", "Adyen", "Square"]
+    return [
+        NewsItem(
+            title=f"{name} is a major competitor",
+            url=f"https://example.com/competitor-{name.lower()}",
+            summary=f"{name} frequently cited as a competitor.",
+            sentiment=0.0,
+        )
+        for name in default_names[:max_results]
+    ]
+
+
 class WebSearchTool:
     async def search(self, query: str, max_results: int = 5) -> list[NewsItem]:
         settings = get_settings()
         if settings.use_mock_tools:
             query_lower = query.lower()
             if "competitor" in query_lower or "compete" in query_lower:
-                return []
+                return _mock_competitor_discovery_results(query_lower, max_results)
             for key, items in MOCK_COMPETITOR_NEWS.items():
                 if key in query_lower:
                     return items[:max_results]

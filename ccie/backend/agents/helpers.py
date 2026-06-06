@@ -4,6 +4,7 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
+from llm.heuristic import extract_company_name, heuristic_classify, heuristic_discover
 from state import CCIEState
 
 
@@ -19,38 +20,19 @@ def get_last_user_message(state: CCIEState) -> str:
     return ""
 
 
-def extract_company_name(text: str) -> str:
-    cleaned = text.strip()
-    for prefix in ("analyze ", "research ", "study "):
-        if cleaned.lower().startswith(prefix):
-            cleaned = cleaned[len(prefix) :].strip()
-    return cleaned.split(".")[0].split(",")[0].strip()
-
-
 def classify_input(text: str) -> tuple[bool, str, str]:
-    company = extract_company_name(text)
-    is_hypothetical = len(text.split()) > 8 or "building" in text.lower() or "targeting" in text.lower()
-    if is_hypothetical:
-        return True, "", text.strip()
-    return False, company, ""
+    """Sync wrapper for tests; production path uses llm.client.classify_company."""
+    result = heuristic_classify(text)
+    return result.is_hypothetical, result.target_company, result.target_description
 
 
-REAL_COMPETITOR_MAP = {
-    "stripe": ["PayPal", "Adyen", "Square"],
-    "paypal": ["Stripe", "Adyen", "Square"],
-}
-
-HYPOTHETICAL_COMPETITORS = ["Kira Systems", "Luminance", "Harvey AI"]
-
-
-def discover_competitors(target_company: str, is_hypothetical: bool, description: str = "") -> list[str]:
-    if is_hypothetical:
-        if "legal" in description.lower() or "law" in description.lower():
-            return HYPOTHETICAL_COMPETITORS
-        return ["Competitor A", "Competitor B", "Competitor C"]
-
-    key = target_company.lower()
-    return REAL_COMPETITOR_MAP.get(key, ["PayPal", "Adyen", "Square"])
+def discover_competitors(
+    target_company: str,
+    is_hypothetical: bool,
+    description: str = "",
+) -> list[str]:
+    """Sync wrapper for tests; production path uses llm.client.discover_competitors_for_target."""
+    return heuristic_discover(target_company, is_hypothetical, description).competitors
 
 
 def ensure_session_id(state: CCIEState) -> str:

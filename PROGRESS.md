@@ -9,8 +9,9 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ Complete | LangGraph swarm, Redis, CopilotKit endpoint live |
-| **Frontend** | ⬜ Not started | CopilotKit info page only (backend registry at `:8000/api/copilotkit/`) |
+| **Agents layer (backend)** | ✅ B1 complete | LLM harness + heuristics; classifier/discovery via `llm/client.py` |
+| **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
+| **Playground UI (dev testing)** | ✅ Scaffolded | `ccie/playground/` — minimal CopilotKit test harness |
 | **Integration (chat UI)** | ⬜ Blocked on frontend | Backend ready for `useCoAgent({ name: "ccie_agent" })` |
 | **3D War Room** | ⬜ Not started | Depends on shared state flowing to frontend |
 | **MVP Phase** | **Between Phase 1 & 2** | Backend exceeds Phase 1 scope; chat UI still missing |
@@ -68,7 +69,17 @@
 
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **24/24 tests passing** (`WEAVE_DISABLED=1 ENV=test pytest backend/tests -v`)
+- [x] **35 tests** — 34 passed, 1 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests -v`)
+
+### LLM agent harness (B1 — 2026-06-06)
+- [x] `ccie/backend/llm/schemas.py` — `ClassifyResult`, `DiscoveryResult`, `SwotResult`
+- [x] `ccie/backend/llm/factory.py` — `get_llm()`, override injection for tests
+- [x] `ccie/backend/llm/heuristic.py` — fallback classify/discover logic
+- [x] `ccie/backend/llm/client.py` — async `classify_company`, `discover_competitors_for_target`
+- [x] Orchestrator uses LLM client; heuristic fallback when no API key / `ENV=test`
+- [x] Per-competitor state emit during discovery
+- [x] Mock competitor search results for discovery queries
+- [x] Tests: `test_llm_client.py`, `test_orchestrator_discovery.py`
 
 ### Docs
 - [x] `ccie/backend/README.md` — setup, run, env vars
@@ -80,7 +91,7 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 24 tests | ✅ Verified 2026-06-06 |
+| pytest green | 34 passed, 1 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
 | Chat UI shows agent output | User types "Stripe" → chat response | ⬜ Not yet |
 | Shared state → UI | `useCoAgent` renders competitors | ⬜ Not yet |
@@ -88,9 +99,110 @@
 
 ---
 
-## Next Steps (Prioritized)
+## Backend & Agent Harness — Next Steps
 
-### Sprint A — Frontend skeleton + chat (Phase 1 completion)
+> **Current harness:** mock tools + heuristic classifier/discovery + template SWOT.  
+> **Works today:** full graph invoke via pytest, CopilotKit endpoint, fakeredis.  
+> **Does not yet use:** OpenAI LLM, real scrape, live Redis, Weave scorers, parallel swarms.
+
+### B1 — Agent harness foundation (do first)
+Wire a proper LLM + structured-output layer so agents stop relying on hardcoded maps.
+
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B1.1 | Add `backend/llm/factory.py` — `get_llm()` returns ChatOpenAI or mock in test | Inject via config; use existing `mock_llm` fixture | ✅ |
+| B1.2 | Add Pydantic response schemas for classifier, discovery, SWOT | e.g. `ClassifyResult`, `DiscoveryResult`, `SwotResult` | ✅ |
+| B1.3 | Replace `classify_input()` heuristic with LLM structured call + fallback | `llm/client.py`, `llm/heuristic.py` | ✅ |
+| B1.4 | Replace `discover_competitors()` static map with LLM + `web_search` | `llm/client.py`, `tools/web_search.py` | ✅ |
+| B1.5 | Emit competitor one-by-one during discovery (state emit per competitor) | `orchestrator.py` | ✅ |
+| B1.6 | Tests: mock LLM paths + one opt-in live LLM test (`INTEGRATION=1`) | `tests/test_llm_client.py` | ✅ |
+
+**Gate:** classifier + discovery use LLM; tests still green with mocks.
+
+---
+
+### B2 — Real tools (swap mocks for prod)
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B2.1 | Finish Tavily integration in `web_search.py` (`ENV=prod`, `TAVILY_API_KEY`) | Already stubbed | ⬜ |
+| B2.2 | Implement real `web_scrape.py` — httpx + BeautifulSoup for pricing/features pages | Add `beautifulsoup4` to requirements | ⬜ |
+| B2.3 | News Scout: LLM parses raw search results → `list[NewsItem]` + sentiment | `agents/news_scout.py` | ⬜ |
+| B2.4 | Product Tracker: LLM structures scraped HTML → `list[ProductItem]` | `agents/product_tracker.py` | ⬜ |
+| B2.5 | Bind `@tool` wrappers into LangGraph tool nodes (not just direct function calls) | Optional refactor for traceability | ⬜ |
+| B2.6 | Tests: keep mock path default; add `INTEGRATION=1` tool smoke tests | `tests/test_tools.py` | ⬜ |
+
+**Gate:** `ENV=prod` runs real search/scrape for Stripe demo.
+
+---
+
+### B3 — Redis & session harness
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B3.1 | Run `docker compose up -d` and verify live Redis read/write | Manual + optional integration test | ⬜ |
+| B3.2 | Persist full session snapshot (`CompanyRecord` + competitors) on graph complete | `memory/redis_client.py` | ⬜ |
+| B3.3 | Load prior session by `session_id` / thread_id for re-analysis | Cross-session delta prep | ⬜ |
+| B3.4 | Graceful degrade when Redis down (log + continue, already partial) | Harden error paths | ⬜ |
+| B3.5 | Redis Iris Context Retriever schemas → auto MCP tools | Post-MVP stretch | ⬜ |
+
+**Gate:** Day 1 Hour 7 — agent output stored in Redis and reloadable.
+
+---
+
+### B4 — Orchestrator & swarm improvements
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B4.1 | Split real vs hypothetical graph branches (classify → enrich/parse → discover/infer) | `orchestrator.py`, `graph.py` — routing exists but both paths merge early | ⬜ |
+| B4.2 | Parallel fan-out per competitor via LangGraph `Send` API | Replace sequential loop in `analyze_competitors_node` | ⬜ |
+| B4.3 | Compute `threat_level`, `market_size`, `market_overlap` from analysis | Populate fields for 3D encoding | ⬜ |
+| B4.4 | Populate `market_quadrants` in landscape synthesis | leader/challenger/niche/visionary | ⬜ |
+| B4.5 | Synthesis: LLM-generated SWOT + executive summary (replace template) | `agents/synthesis.py` | ⬜ |
+| B4.6 | Add **Financial Analyst** agent subgraph | `agents/financial_analyst.py`, `tools/financial_data.py` | ⬜ |
+
+**Gate:** 3–5 competitors analyzed in parallel; state fields ready for 3D scene.
+
+---
+
+### B5 — Observability (Weave)
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B5.1 | Enable Weave in dev (`WANDB_API_KEY`, remove `WEAVE_DISABLED`) | Verify traces in W&B dashboard | ⬜ |
+| B5.2 | Decorate graph nodes with `@weave.op()` | `orchestrator.py`, specialist agents | ⬜ |
+| B5.3 | Custom scorers: freshness, relevance, accuracy | `observability/scorers.py` | ⬜ |
+| B5.4 | Guardrails for hallucinated financial figures / stale news | Weave guardrails | ⬜ |
+
+**Gate:** trace visible for full Stripe run; scorers run on agent outputs.
+
+---
+
+### B6 — CopilotKit / API harness
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B6.1 | Verify full agent run via CopilotKit HTTP (not just registry page) | POST to `/api/copilotkit/agent/ccie_agent` | ⬜ |
+| B6.2 | Add `CopilotKitMiddleware` if needed for frontend tool calls | `main.py` / graph compile | ⬜ |
+| B6.3 | Register CopilotKit Actions (e.g. `render_building`) for GenUI | `main.py` | ⬜ |
+| B6.4 | `.env.example` with all backend env vars documented | repo root or `ccie/` | ⬜ |
+
+**Gate:** agent executable end-to-end through CopilotKit protocol without pytest.
+
+---
+
+### B7 — Backend test harness expansion
+| # | Task | Files / notes | Done |
+|---|---|---|---|
+| B7.1 | Live Redis integration test (`INTEGRATION=1`, docker required) | `tests/test_redis_integration.py` | ⬜ |
+| B7.2 | CopilotKit endpoint smoke test (streaming response) | `tests/test_copilotkit_api.py` | ⬜ |
+| B7.3 | Hypothetical + real company golden-path fixtures | Stripe + legal-tech startup | ⬜ |
+| B7.4 | CI script — `pytest` + lint on push | `.github/workflows/` | ⬜ |
+
+---
+
+## Frontend Next Steps (separate track)
+
+### Playground UI (backend/agent testing — not production frontend)
+- [x] `ccie/playground/` — minimal Next.js + CopilotKit chat + `useCoAgent` state panel
+- [ ] `npm install && npm run dev` — verify chat with backend on `:8000`
+
+### Sprint A — Production frontend (frontend teammate)
 **Goal:** User types "Analyze Stripe" → agent runs → result shows in chat.
 
 | # | Task | Owner track | Done |
@@ -195,4 +307,5 @@ curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
 |---|---|
 | 2026-06-06 | Agents layer complete — orchestrator, News Scout, Product Tracker, Synthesis, Redis, CopilotKit endpoint, 24 tests green |
 | 2026-06-06 | CopilotKit registry page verified — `ccie_agent` live at `:8000/api/copilotkit/` |
-| 2026-06-06 | Created this progress tracker; next up: frontend scaffold (Sprint A) |
+| 2026-06-06 | Created this progress tracker |
+| 2026-06-06 | Added `ccie/playground/` — dev-only CopilotKit UI for backend testing (`ccie/frontend/` reserved) |
