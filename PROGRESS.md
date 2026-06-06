@@ -11,11 +11,11 @@
 |---|---|---|
 | **Agents layer (backend)** | ✅ B4 complete | Parallel `Send` swarms, scoring metrics, LLM SWOT, branched real/hypothetical paths |
 | **Real tools + LLM** | ✅ Live | Tavily search + `OPENAI_API_KEY` for classify/discover/SWOT; company-agnostic discovery |
-| **Observability (Weave)** | ✅ Integrated | P4 module merged; `@trace_node`, auto-score, guardrails wired into server + playground |
+| **Observability (Weave)** | ✅ Enhanced | 7 trace scorers, per-competitor detail, memory metrics, coverage + SWOT completeness tracking |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
 | **Playground UI (dev testing)** | ✅ Working | Multi-turn chat, real competitors per company, Observability activity feed |
 | **Integration (chat UI)** | 🟡 Playground only | Production `ccie/frontend/` still owned by frontend teammate |
-| **Redis (live persistence)** | 🟡 In progress | Fakeredis in tests; live Redis owned by another teammate (B3) |
+| **Redis (live persistence)** | ✅ Integrated | P2 memory module merged; agents use `MemoryService` with auto-index, vector search, LangCache |
 | **3D War Room** | ⬜ Not started | `threat_level`, `market_size`, `market_overlap` ready in state for encoding |
 | **MVP Phase** | **Phase 2 in progress** | Backend + playground + Weave E2E working; prod frontend + 3D still out |
 
@@ -63,11 +63,19 @@
 - [x] Hypothetical path (long description → legal-tech competitors)
 - [x] Tests: `backend/tests/test_orchestrator.py` (6 tests), `test_scoring.py`, `test_discovery.py`
 
-### Redis memory
-- [x] `ccie/backend/memory/schemas.py` — `CompanyRecord`, `StoredNewsItem`
-- [x] `ccie/backend/memory/redis_client.py` — namespaced JSON keys
-- [x] `ccie/backend/memory/factory.py` — injectable client for tests
-- [x] Tests: `backend/tests/test_redis_client.py` (3 tests)
+### Redis memory (P2 module + agent integration)
+- [x] `ccie/backend/memory/` — P2 memory infrastructure (redis_client, schemas, factory, service, etc.)
+- [x] `MemoryService` — unified API over store, Iris adapter, vector search, LangCache
+- [x] Vector search: `IrisVectorSearch` (Redis-persisted) / `StubVectorSearch` (tests)
+- [x] LangCache: `RedisLangCache` (local TTL) / `StubLangCache` (tests) / `LangCacheCloudProvider` (stub)
+- [x] Index hooks: `index_news_items`, `index_product_items`, `index_competitor_profile`, `index_synthesis_intel`
+- [x] MCP tool prep: `mcp_lookup_company`, `mcp_lookup_competitor`, etc.
+- [x] Multi-competitor key partitioning: `session_id:competitor:doc_id`
+- [x] Bootstrap: `configure_memory_providers()` in lifespan selects stubs vs Redis backends
+- [x] **Agent integration**: news_scout, product_tracker, synthesis all use `get_memory_service()`
+- [x] Synthesis auto-indexes SWOT + landscape via `index_synthesis()` and `index_session_intel()`
+- [x] Tests: `backend/tests/test_redis_client.py` + P2's 64 tests (127 total passing)
+- [x] `/health` reports Redis `connected` + `latency_ms`
 
 ### Observability (P4 module + integration)
 - [x] `ccie/backend/observability/` — scorers, guardrails, eval CLI, fixtures (teammate P4)
@@ -79,6 +87,14 @@
 - [x] Tests: `observability/tests/` (45 tests) + `backend/tests/test_scorers.py`
 - [x] Live verified — traces at [ccie-agents Weave UI](https://wandb.ai/mohitmanoj-barade-san-jose-state-university/ccie-agents/weave)
 
+### Weave metrics & logging (enhanced)
+- [x] **Aggregate metrics** — avg_freshness, avg_relevance, avg_product_coverage, avg_swot_completeness, total_news_items, total_products
+- [x] **Per-competitor detail** — name, news_count, product_count, has_swot, threat_level, sentiment in Weave payload
+- [x] **Memory metrics** — Redis connected, latency_ms, docs_indexed reported in observability activity
+- [x] **Trace scorers** — 7 Weave scorers: freshness, relevance, guardrails, competitor_count, product_coverage, swot_completeness, intel_volume
+- [x] **Guardrails** — stale_news, financial_hallucination, per-competitor violation tracking
+- [x] **Activity feed** — Quality, Coverage, Guardrails, Memory status entries visible in playground UI
+
 ### Discovery & LLM (2026-06-06)
 - [x] `llm/discovery.py` — extract competitors from Tavily search when LLM unavailable
 - [x] Removed hardcoded PayPal/Adyen/Square default for unknown companies
@@ -87,7 +103,7 @@
 
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **87 tests** — 87 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
+- [x] **127 tests** — 127 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
 
 ### Real tools (B2 — 2026-06-06)
 - [x] Tavily web search when `ENV=prod` + `TAVILY_API_KEY` — news + products (no scraping)
@@ -113,12 +129,15 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 87 passed, 3 skipped | ✅ Verified 2026-06-06 |
+| pytest green | 127 passed, 3 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
 | Real tools (Tavily) | Any company → relevant competitors + news | ✅ Verified (Stripe, Apple, PAN) |
 | OpenAI LLM path | classify + discover + SWOT via `gpt-4o-mini` | ✅ Verified 2026-06-06 |
 | Weave tracing | `GET /health` → `weave: true`; traces in W&B dashboard | ✅ Verified 2026-06-06 |
 | Auto-score on run | `Observability` entries in activity feed | ✅ Verified (`CCIE_AUTO_SCORE=1`) |
+| Redis live | `GET /health` → `redis.connected: true`; session persisted | ✅ Verified 2026-06-06 |
+| Vector search | Semantic search returns indexed docs post-analysis | ✅ Verified 2026-06-06 |
+| Weave metrics | 7 trace scorers + per-competitor + memory metrics in dashboard | ✅ Verified 2026-06-06 |
 | Chat UI shows agent output | User types "Analyze Stripe" → chat response | ✅ Playground verified |
 | Shared state → UI | `useCoAgent` renders competitors + activity | ✅ Playground state panel |
 | Multi-turn chat | Second analysis replaces (not merges) competitors | ✅ Fixed 2026-06-06 |

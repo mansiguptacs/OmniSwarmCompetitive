@@ -190,11 +190,33 @@ def traced_competitor_count_scorer(output: dict) -> dict:
     }
 
 
+@weave.op()
+def traced_product_coverage_scorer(output: dict) -> dict:
+    return {"avg_product_coverage": _aggregate(output).get("avg_product_coverage", 0.0)}
+
+
+@weave.op()
+def traced_swot_completeness_scorer(output: dict) -> dict:
+    return {"avg_swot_completeness": _aggregate(output).get("avg_swot_completeness", 0.0)}
+
+
+@weave.op()
+def traced_intel_volume_scorer(output: dict) -> dict:
+    agg = _aggregate(output)
+    return {
+        "total_news_items": agg.get("total_news_items", 0),
+        "total_products": agg.get("total_products", 0),
+    }
+
+
 TRACE_LIVE_SCORERS = [
     traced_avg_freshness_scorer,
     traced_avg_relevance_scorer,
     traced_guardrail_scorer,
     traced_competitor_count_scorer,
+    traced_product_coverage_scorer,
+    traced_swot_completeness_scorer,
+    traced_intel_volume_scorer,
 ]
 
 # --- Trace call feedback + server log ---
@@ -229,6 +251,16 @@ async def publish_server_quality(graph_result: dict, report: dict) -> dict[str, 
     if not init_weave():
         return None
     competitors = graph_result.get("competitors") or []
+    per_comp_summary = []
+    for c in competitors:
+        per_comp_summary.append({
+            "name": c.get("name", ""),
+            "news_count": len(c.get("news") or []),
+            "product_count": len(c.get("products") or []),
+            "has_swot": bool(c.get("swot")),
+            "threat_level": c.get("threat_level", 0),
+            "sentiment": c.get("sentiment", 0),
+        })
     payload = {
         "summary": {
             "phase": graph_result.get("phase"),
@@ -237,8 +269,10 @@ async def publish_server_quality(graph_result: dict, report: dict) -> dict[str, 
             "competitor_count": len(competitors),
             "competitor_names": [c.get("name") for c in competitors],
             "session_id": graph_result.get("session_id"),
+            "per_competitor": per_comp_summary,
         },
         "quality_report": report,
+        "memory": report.get("memory"),
     }
     raw = log_server_quality.call(payload)
     if asyncio.iscoroutine(raw):

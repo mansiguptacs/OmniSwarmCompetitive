@@ -31,12 +31,16 @@ def score_live_run(
     per_competitor: dict[str, dict[str, Any]] = {}
     freshness_scores: list[float] = []
     relevance_scores: list[float] = []
+    product_coverage_scores: list[float] = []
+    swot_completeness_scores: list[float] = []
 
     for competitor in competitors:
         name = competitor.get("name") or "unknown"
         quality = score_competitor_completeness(competitor)
         freshness_scores.append(quality["freshness"])
         relevance_scores.append(quality["relevance"])
+        product_coverage_scores.append(quality["product_coverage"])
+        swot_completeness_scores.append(quality["swot_completeness"])
         guardrails = run_live_guardrails(
             {"competitors": [competitor]},
             reference_date=reference_date,
@@ -54,16 +58,24 @@ def score_live_run(
         stale_threshold_days=effective_stale,
     )
 
+    total_news = sum(len(c.get("news") or []) for c in competitors)
+    total_products = sum(len(c.get("products") or []) for c in competitors)
+
     def _avg(values: list[float]) -> float:
         return round(sum(values) / len(values), 4) if values else 0.0
 
     return {
         "target_company": target,
         "phase": graph_result.get("phase"),
+        "is_hypothetical": graph_result.get("is_hypothetical", False),
         "competitor_count": len(competitors),
         "aggregate": {
             "avg_freshness": _avg(freshness_scores),
             "avg_relevance": _avg(relevance_scores),
+            "avg_product_coverage": _avg(product_coverage_scores),
+            "avg_swot_completeness": _avg(swot_completeness_scores),
+            "total_news_items": total_news,
+            "total_products": total_products,
             "guardrails_passed": guardrail_report["passed"],
             "violation_count": guardrail_report["violation_count"],
         },

@@ -1,3 +1,4 @@
+import logging
 import time
 
 from langchain_core.runnables import RunnableConfig
@@ -5,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from agents.helpers import safe_emit_state
 from agents.scoring import compute_competitor_metrics, compute_market_quadrants
 from llm.client import generate_landscape_summary, generate_swot_for_competitor
+from memory.factory import get_memory_service
 from state import (
     CCIEState,
     append_activity,
@@ -14,6 +16,8 @@ from state import (
     parse_competitor,
     set_competitors,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def run_synthesis(
@@ -30,6 +34,7 @@ async def run_synthesis(
     )
 
     updates: dict = {"agent_activity": state["agent_activity"]}
+    session_id = state.get("session_id", "")
 
     if landscape:
         competitors = get_competitors(state)
@@ -45,6 +50,18 @@ async def run_synthesis(
         updates["market_quadrants"] = quadrants
         updates["competitors"] = state["competitors"]
         updates["phase"] = "complete"
+
+        try:
+            service = get_memory_service()
+            await service.index_session_intel(
+                session_id,
+                competitors=scored,
+                synthesis_by_competitor={c.name: c.swot for c in scored if c.swot},
+                landscape_summary=summary,
+            )
+        except Exception:
+            logger.debug("Memory index_session_intel failed", exc_info=True)
+
         await safe_emit_state(config, updates)
         return updates
 
@@ -62,6 +79,16 @@ async def run_synthesis(
         competitors[index] = competitor
         set_competitors(state, competitors)
         updates["competitors"] = [competitor_to_dict(competitor)]
+
+        try:
+            service = get_memory_service()
+            await service.index_synthesis(
+                session_id,
+                competitor.name,
+                swot=competitor.swot,
+            )
+        except Exception:
+            logger.debug("Memory index_synthesis failed for %s", competitor.name, exc_info=True)
 
     await safe_emit_state(config, updates)
     return updates

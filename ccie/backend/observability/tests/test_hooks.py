@@ -129,8 +129,8 @@ def test_traced_competitor_count_scorer():
 
 
 @pytest.mark.asyncio
-async def test_on_graph_complete_disabled_by_default():
-    os.environ.pop("CCIE_AUTO_SCORE", None)
+async def test_on_graph_complete_disabled_by_default(monkeypatch):
+    monkeypatch.setenv("CCIE_AUTO_SCORE", "")
     get_observability_settings.cache_clear()
     assert await on_graph_complete({"competitors": []}) is None
 
@@ -181,8 +181,8 @@ async def test_on_graph_complete_weave_scorers_when_enabled(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_wrap_graph_noop_when_disabled():
-    os.environ.pop("CCIE_AUTO_SCORE", None)
+async def test_wrap_graph_noop_when_disabled(monkeypatch):
+    monkeypatch.setenv("CCIE_AUTO_SCORE", "")
     get_observability_settings.cache_clear()
     g = FakeGraph()
     assert wrap_graph_for_observability(g) is g

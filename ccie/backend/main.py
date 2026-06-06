@@ -21,10 +21,9 @@ _weave_active = init_weave()
 async def lifespan(app: FastAPI):
     configure_memory_providers()
     try:
-        await verify_redis_on_startup()
+        await verify_redis_on_startup(strict=False)
     except RuntimeError as exc:
         logger.error("%s", exc)
-        raise
     yield
 
 

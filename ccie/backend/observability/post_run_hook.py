@@ -34,6 +34,10 @@ def build_observability_activity(
     agg = report.get("aggregate") or {}
     freshness = agg.get("avg_freshness", 0.0)
     relevance = agg.get("avg_relevance", 0.0)
+    product_cov = agg.get("avg_product_coverage", 0.0)
+    swot_comp = agg.get("avg_swot_completeness", 0.0)
+    total_news = agg.get("total_news_items", 0)
+    total_products = agg.get("total_products", 0)
     passed = agg.get("guardrails_passed", True)
     violations = agg.get("violation_count", 0)
 
@@ -46,7 +50,15 @@ def build_observability_activity(
                 f"competitors {report.get('competitor_count', 0)}"
             ),
             "ts": timestamp,
-        }
+        },
+        {
+            "agent": "Observability",
+            "status": (
+                f"Coverage — SWOT {swot_comp:.0%}, products {product_cov:.0%}, "
+                f"{total_news} news, {total_products} products"
+            ),
+            "ts": timestamp + 0.001,
+        },
     ]
 
     if "accuracy" in report:
@@ -54,7 +66,7 @@ def build_observability_activity(
             {
                 "agent": "Observability",
                 "status": f"Accuracy score {report['accuracy']:.2f} vs ground truth",
-                "ts": timestamp + 0.001,
+                "ts": timestamp + 0.002,
             }
         )
 
@@ -63,7 +75,7 @@ def build_observability_activity(
             {
                 "agent": "Observability",
                 "status": f"Guardrails FAILED — {violations} violation(s) detected",
-                "ts": timestamp + 0.002,
+                "ts": timestamp + 0.003,
             }
         )
     else:
@@ -71,7 +83,28 @@ def build_observability_activity(
             {
                 "agent": "Observability",
                 "status": "Guardrails passed — intel quality OK",
-                "ts": timestamp + 0.002,
+                "ts": timestamp + 0.003,
+            }
+        )
+
+    mem = report.get("memory") or {}
+    if mem.get("redis_connected"):
+        entries.append(
+            {
+                "agent": "Observability",
+                "status": (
+                    f"Memory — Redis OK ({mem.get('latency_ms', 0):.1f}ms), "
+                    f"session persisted, {mem.get('docs_indexed', 0)} docs indexed"
+                ),
+                "ts": timestamp + 0.004,
+            }
+        )
+    elif mem:
+        entries.append(
+            {
+                "agent": "Observability",
+                "status": "Memory — Redis unavailable, session not persisted",
+                "ts": timestamp + 0.004,
             }
         )
 

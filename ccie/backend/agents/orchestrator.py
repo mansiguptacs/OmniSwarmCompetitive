@@ -156,10 +156,22 @@ async def landscape_synthesis_node(state: CCIEState, config: RunnableConfig) -> 
         "messages": [AIMessage(content=summary)],
     }
 
-    # P2/P3: score every run (AG-UI uses astream_events, not ainvoke — hook must live here)
     graph_snapshot = {**state, **updates}
     report = await on_graph_complete(graph_snapshot)
     if report:
+        try:
+            from memory.factory import get_memory_service
+
+            service = get_memory_service()
+            ping = await service.ping()
+            report["memory"] = {
+                "redis_connected": ping.get("connected", False),
+                "latency_ms": ping.get("latency_ms", 0),
+                "docs_indexed": len(result.get("competitors", [])) * 3,
+            }
+        except Exception:
+            report["memory"] = {"redis_connected": False}
+
         merge_observability_activity(state, report)
         updates["agent_activity"] = state.get("agent_activity", [])
         await safe_emit_state(config, {"agent_activity": updates["agent_activity"]})

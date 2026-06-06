@@ -1,9 +1,10 @@
+import logging
 import time
 
 from langchain_core.runnables import RunnableConfig
 
 from agents.helpers import ensure_session_id, safe_emit_state
-from memory.factory import get_redis_memory
+from memory.factory import get_memory_service
 from state import (
     CCIEState,
     Competitor,
@@ -13,6 +14,9 @@ from state import (
     set_competitors,
 )
 from tools.web_search import search_news
+
+logger = logging.getLogger(__name__)
+
 
 async def run_news_scout(
     state: CCIEState,
@@ -44,11 +48,11 @@ async def run_news_scout(
     set_competitors(state, competitors)
 
     try:
-        redis = get_redis_memory()
-        await redis.save_news(session_id, target, news_items)
-        await redis.save_competitors(session_id, competitors)
+        service = get_memory_service()
+        await service.save_news(session_id, target, news_items)
+        await service.save_competitors(session_id, competitors)
     except Exception:
-        pass
+        logger.debug("Memory persist failed for news_scout/%s", target, exc_info=True)
 
     await safe_emit_state(config, {"competitors": state["competitors"]})
 
