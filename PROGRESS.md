@@ -9,7 +9,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ B2 complete | Real Tavily search + httpx scrape + LLM news/product parsing |
+| **Agents layer (backend)** | ✅ B4 complete | Parallel swarms, scoring metrics, LLM SWOT, branched real/hypothetical paths |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
 | **Playground UI (dev testing)** | ✅ Working | `ccie/playground/` — chat + `useCoAgent` state panel verified |
 | **Integration (chat UI)** | 🟡 Playground only | Production `ccie/frontend/` still owned by frontend teammate |
@@ -95,7 +95,7 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 34 passed, 1 skipped | ✅ Verified 2026-06-06 |
+| pytest green | 37 passed, 3 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
 | Chat UI shows agent output | User types "Stripe" → chat response | ✅ Playground verified 2026-06-06 |
 | Shared state → UI | `useCoAgent` renders competitors | ✅ Playground state panel (phase, activity, competitors) |
@@ -155,11 +155,11 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 ### B4 — Orchestrator & swarm improvements
 | # | Task | Files / notes | Done |
 |---|---|---|---|
-| B4.1 | Split real vs hypothetical graph branches (classify → enrich/parse → discover/infer) | `orchestrator.py`, `graph.py` — routing exists but both paths merge early | ⬜ |
-| B4.2 | Parallel fan-out per competitor via LangGraph `Send` API | Replace sequential loop in `analyze_competitors_node` | ⬜ |
-| B4.3 | Compute `threat_level`, `market_size`, `market_overlap` from analysis | Populate fields for 3D encoding | ⬜ |
-| B4.4 | Populate `market_quadrants` in landscape synthesis | leader/challenger/niche/visionary | ⬜ |
-| B4.5 | Synthesis: LLM-generated SWOT + executive summary (replace template) | `agents/synthesis.py` | ⬜ |
+| B4.1 | Split real vs hypothetical graph branches (classify → enrich/parse → discover/infer) | `orchestrator.py`, `graph.py` — routing exists but both paths merge early | ✅ |
+| B4.2 | Parallel fan-out per competitor via LangGraph `Send` API | Replace sequential loop in `analyze_competitors_node` | ✅ |
+| B4.3 | Compute `threat_level`, `market_size`, `market_overlap` from analysis | Populate fields for 3D encoding | ✅ |
+| B4.4 | Populate `market_quadrants` in landscape synthesis | leader/challenger/niche/visionary | ✅ |
+| B4.5 | Synthesis: LLM-generated SWOT + executive summary (replace template) | `agents/synthesis.py` | ✅ |
 | B4.6 | Add **Financial Analyst** agent subgraph | `agents/financial_analyst.py`, `tools/financial_data.py` | ⬜ |
 
 **Gate:** 3–5 competitors analyzed in parallel; state fields ready for 3D scene.
@@ -314,4 +314,4 @@ curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
 | 2026-06-06 | CopilotKit registry page verified — `ccie_agent` live at `:8000/api/copilotkit/` |
 | 2026-06-06 | Created this progress tracker |
 | 2026-06-06 | Added `ccie/playground/` — dev-only CopilotKit UI for backend testing (`ccie/frontend/` reserved) |
-| 2026-06-06 | B2 complete — Tavily search, live scrape, LLM news/product parsing; 37 tests green |
+| 2026-06-06 | B4 complete — parallel Send swarms, competitor scoring, market quadrants, LLM SWOT, branched real/hypothetical graph; 37 tests green |

@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage
 from agents.graph import compile_graph
 from agents.product_tracker import run_product_tracker
 from agents.synthesis import run_synthesis
-from state import default_ccie_state, get_competitors, set_competitors, Competitor
+from state import default_ccie_state, get_competitors, set_competitors, Competitor, NewsItem, ProductItem
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,11 @@ async def test_product_tracker_populates_products(sample_state):
 @pytest.mark.asyncio
 async def test_synthesis_generates_swot(sample_state):
     competitors = [
-        Competitor(name="PayPal", news=[], products=[]),
+        Competitor(
+            name="PayPal",
+            news=[NewsItem(title="PayPal news", sentiment=0.5)],
+            products=[ProductItem(name="PayPal Commerce")],
+        ),
     ]
     set_competitors(sample_state, competitors)
     config = {"configurable": {"thread_id": "synthesis-test"}}
@@ -33,6 +37,24 @@ async def test_synthesis_generates_swot(sample_state):
     assert "weaknesses" in competitor.swot
     assert "opportunities" in competitor.swot
     assert "threats" in competitor.swot
+    assert 0.0 < competitor.threat_level <= 1.0
+
+
+@pytest.mark.asyncio
+async def test_landscape_synthesis_sets_quadrants(sample_state):
+    competitors = [
+        Competitor(name="PayPal", threat_level=0.7, market_size=0.6, market_overlap=0.5),
+        Competitor(name="Adyen", threat_level=0.6, market_size=0.5, market_overlap=0.5),
+    ]
+    set_competitors(sample_state, competitors)
+    sample_state["target_company"] = "Stripe"
+    config = {"configurable": {"thread_id": "landscape-test"}}
+
+    result = await run_synthesis(sample_state, config, landscape=True)
+
+    assert result["phase"] == "complete"
+    assert result["market_quadrants"]
+    assert result["landscape_summary"]
 
 
 @pytest.mark.asyncio
@@ -49,6 +71,12 @@ async def test_full_integration(orchestrator_graph, redis_client):
         assert competitor.news
         assert competitor.products
         assert competitor.swot
+        assert 0.0 <= competitor.threat_level <= 1.0
+        assert 0.0 <= competitor.market_size <= 1.0
+        assert 0.0 <= competitor.market_overlap <= 1.0
+
+    assert result.get("market_quadrants")
+    assert isinstance(result["market_quadrants"], dict)
 
     session_id = result["session_id"]
     assert session_id

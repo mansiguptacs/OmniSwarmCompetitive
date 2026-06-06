@@ -1,9 +1,10 @@
 from langchain_core.messages import HumanMessage
 
+from llm.discovery import extract_competitors_from_search
 from llm.factory import get_llm
-from llm.heuristic import heuristic_classify, heuristic_discover
-from llm.schemas import ClassifyResult, DiscoveryResult
-from state import NewsItem
+from llm.heuristic import heuristic_classify, heuristic_discover, _supplement_known_map
+from llm.schemas import ClassifyResult, DiscoveryResult, SwotResult
+from state import Competitor, NewsItem
 from tools.web_search import search_news
 
 
@@ -51,7 +52,12 @@ async def discover_competitors_for_target(
 
     llm = get_llm()
     if llm is None:
-        return heuristic_discover(target_company, is_hypothetical, description)
+        return heuristic_discover(
+            target_company,
+            is_hypothetical,
+            description,
+            search_results=search_results,
+        )
 
     structured = llm.with_structured_output(DiscoveryResult)
     prompt = (
@@ -66,11 +72,131 @@ async def discover_competitors_for_target(
         result = await structured.ainvoke([HumanMessage(content=prompt)])
         if isinstance(result, DiscoveryResult):
             if not result.competitors:
-                return heuristic_discover(target_company, is_hypothetical, description)
+                return _discovery_fallback(
+                    target_company, is_hypothetical, description, search_results
+                )
             return result
         parsed = DiscoveryResult.model_validate(result)
         if not parsed.competitors:
-            return heuristic_discover(target_company, is_hypothetical, description)
+            return _discovery_fallback(
+                target_company, is_hypothetical, description, search_results
+            )
         return parsed
     except Exception:
-        return heuristic_discover(target_company, is_hypothetical, description)
+        return _discovery_fallback(
+            target_company, is_hypothetical, description, search_results
+        )
+
+
+def _discovery_fallback(
+    target_company: str,
+    is_hypothetical: bool,
+    description: str,
+    search_results: list[NewsItem],
+) -> DiscoveryResult:
+    names = extract_competitors_from_search(search_results, target_company)
+    if names:
+        return DiscoveryResult(
+            competitors=_supplement_known_map(names, target_company),
+            reasoning="Fallback: extracted competitors from web search results.",
+        )
+    return heuristic_discover(
+        target_company,
+        is_hypothetical,
+        description,
+        search_results=search_results,
+    )
+
+
+def _format_competitor_context(competitor: Competitor) -> str:
+    news_lines = [
+        f"- {item.title}: {item.summary or item.url}"
+        for item in competitor.news[:5]
+    ]
+    product_lines = [
+        f"- {item.name}: {item.pricing or item.description}"
+        for item in competitor.products[:5]
+    ]
+    return (
+        f"Competitor: {competitor.name}\n"
+        f"News ({len(competitor.news)} items):\n"
+        + ("\n".join(news_lines) or "- none")
+        + f"\nProducts ({len(competitor.products)} items):\n"
+        + ("\n".join(product_lines) or "- none")
+    )
+
+
+async def generate_swot_for_competitor(
+    competitor: Competitor,
+    target_company: str,
+) -> SwotResult:
+    llm = get_llm()
+    if llm is None:
+        return SwotResult(
+            strengths=[f"{competitor.name} has strong market presence"],
+            weaknesses=["Potential pricing pressure in core segments"],
+            opportunities=["Expansion into adjacent markets"],
+            threats=[f"Competitive momentum from {len(competitor.news)} recent news signals"],
+            executive_summary=(
+                f"{competitor.name} is a notable competitor to {target_company or 'the target'}."
+            ),
+        )
+
+    structured = llm.with_structured_output(SwotResult)
+    prompt = (
+        "Generate a concise SWOT analysis for competitive intelligence.\n"
+        f"Target company being analyzed against: {target_company or 'N/A'}\n\n"
+        f"{_format_competitor_context(competitor)}\n\n"
+        "Base strengths, weaknesses, opportunities, and threats on the evidence above. "
+        "Include a one-sentence executive_summary."
+    )
+    try:
+        result = await structured.ainvoke([HumanMessage(content=prompt)])
+        if isinstance(result, SwotResult):
+            return result
+        return SwotResult.model_validate(result)
+    except Exception:
+        return SwotResult(
+            strengths=[f"{competitor.name} has strong market presence"],
+            weaknesses=["Potential pricing pressure in core segments"],
+            opportunities=["Expansion into adjacent markets"],
+            threats=[f"Competitive momentum from {len(competitor.news)} recent news signals"],
+            executive_summary=(
+                f"{competitor.name} is a notable competitor to {target_company or 'the target'}."
+            ),
+        )
+
+
+async def generate_landscape_summary(
+    target_company: str,
+    competitors: list[Competitor],
+    quadrants: dict[str, list[str]],
+) -> str:
+    llm = get_llm()
+    names = ", ".join(c.name for c in competitors)
+    quadrant_text = "\n".join(
+        f"- {key}: {', '.join(values) if values else 'none'}"
+        for key, values in quadrants.items()
+    )
+    fallback = (
+        f"Competitive landscape analysis complete for {target_company or 'target'}. "
+        f"Key competitors: {names}."
+    )
+
+    if llm is None:
+        return fallback
+
+    prompt = (
+        "Write a 2-3 sentence executive summary of this competitive landscape.\n"
+        f"Target: {target_company or 'N/A'}\n"
+        f"Competitors: {names}\n"
+        f"Market quadrants:\n{quadrant_text}\n"
+    )
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        content = response.content
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    except Exception:
+        pass
+    return fallback

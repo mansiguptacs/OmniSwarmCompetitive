@@ -1,21 +1,25 @@
 import time
+import uuid
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Send
 
 from agents.helpers import ensure_session_id, get_last_user_message, safe_emit_state
 from agents.news_scout import run_news_scout
 from agents.product_tracker import run_product_tracker
 from agents.synthesis import run_synthesis
 from llm.client import classify_company, discover_competitors_for_target
-from state import CCIEState, Competitor, append_activity, set_competitors
+from state import CCIEState, Competitor, append_activity, competitor_to_dict, set_competitors
+from tools.web_search import search_news
 
 
 async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
     user_text = get_last_user_message(state)
     classification = await classify_company(user_text)
-    session_id = ensure_session_id(state)
+    session_id = str(uuid.uuid4())
 
+    state["agent_activity"] = []
     append_activity(state, "Orchestrator", "Classifying company input...", time.time())
 
     updates = {
@@ -24,6 +28,41 @@ async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
         "target_company": classification.target_company,
         "target_description": classification.target_description,
         "session_id": session_id,
+        "competitors": [],
+        "landscape_summary": "",
+        "market_quadrants": {},
+        "agent_activity": state["agent_activity"],
+    }
+    await safe_emit_state(config, updates)
+    return updates
+
+
+async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
+    target = state.get("target_company", "")
+    append_activity(state, "Orchestrator", f"Enriching profile for {target}...", time.time())
+
+    overview = await search_news(f"{target} company overview", max_results=1)
+    description = overview[0].summary if overview else f"Established company: {target}"
+
+    updates = {
+        "target_description": description,
+        "agent_activity": state["agent_activity"],
+    }
+    await safe_emit_state(config, updates)
+    return updates
+
+
+async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> dict:
+    description = state.get("target_description") or get_last_user_message(state)
+    append_activity(
+        state,
+        "Orchestrator",
+        "Parsing hypothetical company description...",
+        time.time(),
+    )
+
+    updates = {
+        "target_description": description,
         "agent_activity": state["agent_activity"],
     }
     await safe_emit_state(config, updates)
@@ -67,29 +106,36 @@ async def discover_competitors_node(state: CCIEState, config: RunnableConfig) ->
         )
 
     return {
-        "phase": "discovering",
+        "phase": "analyzing",
         "competitors": state["competitors"],
         "agent_activity": state["agent_activity"],
+        "session_id": state.get("session_id", ""),
     }
 
 
-async def analyze_competitors_node(state: CCIEState, config: RunnableConfig) -> dict:
-    state["phase"] = "analyzing"
-    append_activity(state, "Orchestrator", "Running competitor analysis swarms...", time.time())
-    await safe_emit_state(config, {"phase": "analyzing"})
+async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> dict:
+    name = state.get("competitor_name", "")
+    if not name:
+        return {}
 
-    for competitor in state.get("competitors", []):
-        name = competitor.get("name", "")
-        if not name:
-            continue
-        await run_news_scout(state, config, competitor_name=name)
-        await run_product_tracker(state, config, competitor_name=name)
-        await run_synthesis(state, config, competitor_name=name)
+    activity_start = len(state.get("agent_activity", []))
+
+    await run_news_scout(state, config, competitor_name=name)
+    await run_product_tracker(state, config, competitor_name=name)
+    await run_synthesis(state, config, competitor_name=name)
+
+    from state import find_competitor_index, get_competitors, parse_competitor
+
+    index = find_competitor_index(state, name)
+    if index is None:
+        return {}
+
+    competitor = parse_competitor(get_competitors(state)[index])
+    new_activity = state.get("agent_activity", [])[activity_start:]
 
     return {
-        "competitors": state["competitors"],
-        "agent_activity": state["agent_activity"],
-        "phase": "analyzing",
+        "competitors": [competitor_to_dict(competitor)],
+        "agent_activity": new_activity,
     }
 
 
@@ -121,5 +167,20 @@ async def echo_ack_node(state: CCIEState, config: RunnableConfig) -> dict:
 
 def route_after_classify(state: CCIEState) -> str:
     if state.get("is_hypothetical"):
-        return "discover"
-    return "discover"
+        return "parse_hypothetical"
+    return "enrich_real"
+
+
+def fan_out_competitors(state: CCIEState) -> list[Send]:
+    session_id = state.get("session_id", "")
+    sends = []
+    for competitor in state.get("competitors", []):
+        name = competitor.get("name", "")
+        if name:
+            sends.append(
+                Send(
+                    "analyze_competitor",
+                    {"competitor_name": name, "session_id": session_id},
+                )
+            )
+    return sends

@@ -103,6 +103,9 @@ def _mock_competitor_discovery_results(query_lower: str, max_results: int) -> li
     discovery_map = {
         "stripe": ["PayPal", "Adyen", "Square"],
         "paypal": ["Stripe", "Adyen", "Square"],
+        "apple": ["Samsung", "Google", "Microsoft"],
+        "google": ["Microsoft", "Apple", "Amazon"],
+        "microsoft": ["Google", "Apple", "Amazon"],
         "legal": ["Kira Systems", "Luminance", "Harvey AI"],
     }
     for key, names in discovery_map.items():
@@ -116,15 +119,16 @@ def _mock_competitor_discovery_results(query_lower: str, max_results: int) -> li
                 )
                 for name in names[:max_results]
             ]
-    default_names = ["PayPal", "Adyen", "Square"]
+    target = query_lower.replace("competitors", "").replace("competitor", "").strip()
+    fallback_names = [f"{target.title()} rival {index}" for index in range(1, max_results + 1)]
     return [
         NewsItem(
-            title=f"{name} is a major competitor",
-            url=f"https://example.com/competitor-{name.lower()}",
+            title=f"{name} competes in the same market",
+            url=f"https://example.com/competitor-{index}",
             summary=f"{name} frequently cited as a competitor.",
             sentiment=0.0,
         )
-        for name in default_names[:max_results]
+        for index, name in enumerate(fallback_names, start=1)
     ]
 
 

@@ -60,3 +60,31 @@ async def test_orchestrator_hypothetical_path():
 
     assert result["is_hypothetical"] is True
     assert len(result["competitors"]) >= 3
+
+
+@pytest.mark.asyncio
+async def test_same_thread_new_analysis_replaces_competitors():
+    graph = compile_graph(echo=False)
+    config = {"configurable": {"thread_id": "orchestrator-same-thread"}}
+
+    stripe = await graph.ainvoke(
+        default_ccie_state(messages=[HumanMessage(content="analyze stripe")]),
+        config,
+    )
+    stripe_names = {c["name"] for c in stripe["competitors"]}
+    assert stripe_names
+
+    pan = await graph.ainvoke(
+        {
+            **stripe,
+            "messages": stripe.get("messages", [])
+            + [HumanMessage(content="analyze palo alto networks")],
+        },
+        config,
+    )
+    pan_names = {c["name"] for c in pan["competitors"]}
+
+    assert pan.get("target_company", "").lower() == "palo alto networks"
+    assert not pan_names.intersection({"PayPal", "Square", "Adyen"}), (
+        f"Stale payment competitors leaked into PAN run: {pan_names}"
+    )

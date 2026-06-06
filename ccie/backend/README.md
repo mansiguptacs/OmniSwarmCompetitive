@@ -79,7 +79,7 @@ Set `REDIS_URL=redis://localhost:6379/0`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | Optional — improves classify/discover/SWOT (not required for search tools) |
+| `OPENAI_API_KEY` | — | Recommended — classify/discover/SWOT/landscape summary (Tavily still handles search) |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
 | `ENV` | `dev` | `dev`/`test` use mock tools; set `prod` for Tavily search |
 | `USE_MOCK_TOOLS` | — | Override: `1` force mocks, `0` force real tools |

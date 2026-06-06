@@ -3,33 +3,17 @@ import time
 from langchain_core.runnables import RunnableConfig
 
 from agents.helpers import safe_emit_state
-
+from agents.scoring import compute_competitor_metrics, compute_market_quadrants
+from llm.client import generate_landscape_summary, generate_swot_for_competitor
 from state import (
     CCIEState,
     append_activity,
+    competitor_to_dict,
     find_competitor_index,
     get_competitors,
     parse_competitor,
     set_competitors,
 )
-
-
-def generate_swot(competitor_name: str, news_count: int, product_count: int) -> dict:
-    return {
-        "strengths": [
-            f"{competitor_name} has strong market presence",
-            f"Active product portfolio with {product_count} tracked offerings",
-        ],
-        "weaknesses": [
-            "Potential pricing pressure in core segments",
-        ],
-        "opportunities": [
-            "Expansion into adjacent payment and software markets",
-        ],
-        "threats": [
-            f"Recent news volume ({news_count} items) signals competitive momentum",
-        ],
-    }
 
 
 async def run_synthesis(
@@ -49,11 +33,17 @@ async def run_synthesis(
 
     if landscape:
         competitors = get_competitors(state)
-        names = ", ".join(c.name for c in competitors)
-        updates["landscape_summary"] = (
-            f"Competitive landscape analysis complete for {state.get('target_company', 'target')}. "
-            f"Key competitors: {names}."
+        scored = [compute_competitor_metrics(c) for c in competitors]
+        set_competitors(state, scored)
+        quadrants = compute_market_quadrants(scored)
+        summary = await generate_landscape_summary(
+            state.get("target_company", ""),
+            scored,
+            quadrants,
         )
+        updates["landscape_summary"] = summary
+        updates["market_quadrants"] = quadrants
+        updates["competitors"] = state["competitors"]
         updates["phase"] = "complete"
         await safe_emit_state(config, updates)
         return updates
@@ -62,15 +52,16 @@ async def run_synthesis(
     index = find_competitor_index(state, competitor_name or "")
     if index is not None:
         competitor = parse_competitor(competitors[index])
-        competitor.swot = generate_swot(
-            competitor.name,
-            len(competitor.news),
-            len(competitor.products),
+        swot_result = await generate_swot_for_competitor(
+            competitor,
+            state.get("target_company", ""),
         )
+        competitor.swot = swot_result.as_dict()
+        competitor = compute_competitor_metrics(competitor)
         competitor.status = "complete"
         competitors[index] = competitor
         set_competitors(state, competitors)
-        updates["competitors"] = state["competitors"]
+        updates["competitors"] = [competitor_to_dict(competitor)]
 
     await safe_emit_state(config, updates)
     return updates

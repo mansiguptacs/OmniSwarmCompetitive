@@ -1,7 +1,28 @@
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from copilotkit import CopilotKitState
 from pydantic import BaseModel, Field
+
+
+def merge_competitors_by_name(existing: list[dict], incoming: list[dict]) -> list[dict]:
+    if not incoming:
+        return []
+    merged = {c.get("name", ""): dict(c) for c in existing if c.get("name")}
+    for item in incoming:
+        name = item.get("name", "")
+        if not name:
+            continue
+        if name in merged:
+            merged[name] = {**merged[name], **item}
+        else:
+            merged[name] = dict(item)
+    return list(merged.values())
+
+
+def merge_activity(existing: list[dict], incoming: list[dict]) -> list[dict]:
+    if not incoming:
+        return []
+    return existing + incoming
 
 
 class NewsItem(BaseModel):
@@ -54,10 +75,11 @@ class CCIEState(CopilotKitState, total=False):
     target_company: str
     target_description: str
     is_hypothetical: bool
-    competitors: list[dict]
+    competitor_name: str
+    competitors: Annotated[list[dict], merge_competitors_by_name]
     landscape_summary: str
     market_quadrants: dict
-    agent_activity: list[dict]
+    agent_activity: Annotated[list[dict], merge_activity]
     phase: Phase
     session_id: str
 

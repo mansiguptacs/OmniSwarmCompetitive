@@ -40,6 +40,15 @@ async def test_discover_competitors_heuristic_fallback():
 
 
 @pytest.mark.asyncio
+async def test_discover_competitors_apple_not_stripe_defaults():
+    result = await discover_competitors_for_target("Apple", is_hypothetical=False)
+    assert result.competitors
+    assert "PayPal" not in result.competitors
+    assert "Adyen" not in result.competitors
+    assert "Square" not in result.competitors
+
+
+@pytest.mark.asyncio
 async def test_discover_competitors_hypothetical_heuristic():
     text = "AI legal document review for mid-size law firms"
     result = await discover_competitors_for_target("", True, text)
@@ -76,6 +85,12 @@ async def test_discover_competitors_with_mock_llm():
     )
     mock_llm = MagicMock()
     mock_llm.with_structured_output.return_value = mock_structured
+    mock_structured.ainvoke = AsyncMock(
+        return_value=DiscoveryResult(
+            competitors=["PayPal", "Adyen", "Square"],
+            reasoning="mock discovery",
+        )
+    )
     set_llm_override(mock_llm)
 
     result = await discover_competitors_for_target("Stripe", is_hypothetical=False)
@@ -90,6 +105,9 @@ async def test_discover_competitors_llm_empty_falls_back():
     )
     mock_llm = MagicMock()
     mock_llm.with_structured_output.return_value = mock_structured
+    mock_structured.ainvoke = AsyncMock(
+        return_value=DiscoveryResult(competitors=[], reasoning="empty")
+    )
     set_llm_override(mock_llm)
 
     result = await discover_competitors_for_target("Stripe", is_hypothetical=False)
