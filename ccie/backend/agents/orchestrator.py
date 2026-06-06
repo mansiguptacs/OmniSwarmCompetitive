@@ -10,10 +10,13 @@ from agents.news_scout import run_news_scout
 from agents.product_tracker import run_product_tracker
 from agents.synthesis import run_synthesis
 from llm.client import classify_company, discover_competitors_for_target
+from observability.decorators import trace_node
+from observability.post_run_hook import merge_observability_activity, on_graph_complete
 from state import CCIEState, Competitor, append_activity, competitor_to_dict, set_competitors
 from tools.web_search import search_news
 
 
+@trace_node(name="classify")
 async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
     user_text = get_last_user_message(state)
     classification = await classify_company(user_text)
@@ -37,6 +40,7 @@ async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
     return updates
 
 
+@trace_node(name="enrich_real")
 async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
     target = state.get("target_company", "")
     append_activity(state, "Orchestrator", f"Enriching profile for {target}...", time.time())
@@ -52,6 +56,7 @@ async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
     return updates
 
 
+@trace_node(name="parse_hypothetical")
 async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> dict:
     description = state.get("target_description") or get_last_user_message(state)
     append_activity(
@@ -69,6 +74,7 @@ async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> d
     return updates
 
 
+@trace_node(name="discover_competitors")
 async def discover_competitors_node(state: CCIEState, config: RunnableConfig) -> dict:
     append_activity(state, "Orchestrator", "Discovering competitors...", time.time())
 
@@ -113,6 +119,7 @@ async def discover_competitors_node(state: CCIEState, config: RunnableConfig) ->
     }
 
 
+@trace_node(name="analyze_competitor")
 async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> dict:
     name = state.get("competitor_name", "")
     if not name:
@@ -139,14 +146,25 @@ async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> d
     }
 
 
+@trace_node(name="landscape_synthesis")
 async def landscape_synthesis_node(state: CCIEState, config: RunnableConfig) -> dict:
     state["phase"] = "synthesizing"
     result = await run_synthesis(state, config, landscape=True)
     summary = result.get("landscape_summary", "Analysis complete.")
-    return {
+    updates = {
         **result,
         "messages": [AIMessage(content=summary)],
     }
+
+    # P2/P3: score every run (AG-UI uses astream_events, not ainvoke — hook must live here)
+    graph_snapshot = {**state, **updates}
+    report = await on_graph_complete(graph_snapshot)
+    if report:
+        merge_observability_activity(state, report)
+        updates["agent_activity"] = state.get("agent_activity", [])
+        await safe_emit_state(config, {"agent_activity": updates["agent_activity"]})
+
+    return updates
 
 
 async def echo_ack_node(state: CCIEState, config: RunnableConfig) -> dict:

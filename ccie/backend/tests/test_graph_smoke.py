@@ -44,4 +44,8 @@ def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["agent"] == "ccie_agent"
+    assert "weave" in body
+    assert "auto_score" in body

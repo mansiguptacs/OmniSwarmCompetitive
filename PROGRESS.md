@@ -169,10 +169,10 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 ### B5 — Observability (Weave)
 | # | Task | Files / notes | Done |
 |---|---|---|---|
-| B5.1 | Enable Weave in dev (`WANDB_API_KEY`, remove `WEAVE_DISABLED`) | Verify traces in W&B dashboard | ⬜ |
-| B5.2 | Decorate graph nodes with `@weave.op()` | `orchestrator.py`, specialist agents | ⬜ |
-| B5.3 | Custom scorers: freshness, relevance, accuracy | `observability/scorers.py` | ⬜ |
-| B5.4 | Guardrails for hallucinated financial figures / stale news | Weave guardrails | ⬜ |
+| B5.1 | Enable Weave in dev (`WANDB_API_KEY`, remove `WEAVE_DISABLED`) | Verify traces in W&B dashboard | 🟡 wired — set keys in `.env` |
+| B5.2 | Decorate graph nodes with `@trace_node` | `orchestrator.py` — all orchestrator nodes | ✅ |
+| B5.3 | Custom scorers: freshness, relevance, accuracy | `observability/scorers.py` + P2 hook in `landscape_synthesis_node` | ✅ |
+| B5.4 | Guardrails for hallucinated financial figures / stale news | `observability/guardrails.py` via `CCIE_AUTO_SCORE=1` | ✅ |
 
 **Gate:** trace visible for full Stripe run; scorers run on agent outputs.
 
@@ -184,7 +184,7 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | B6.1 | Verify full agent run via CopilotKit HTTP (not just registry page) | AG-UI SSE at `POST /api/copilotkit/`; playground proxy verified | ✅ |
 | B6.2 | Add `CopilotKitMiddleware` if needed for frontend tool calls | `main.py` / graph compile | ⬜ |
 | B6.3 | Register CopilotKit Actions (e.g. `render_building`) for GenUI | `main.py` | ⬜ |
-| B6.4 | `.env.example` with all backend env vars documented | repo root or `ccie/` | ⬜ |
+| B6.4 | `.env.example` with all backend env vars documented | repo root or `ccie/` | ✅ |
 
 **Gate:** agent executable end-to-end through CopilotKit protocol without pytest.
 
