@@ -24,6 +24,12 @@ async def test_save_and_get_competitors(redis_client):
 
 
 @pytest.mark.asyncio
+async def test_ping(redis_client):
+    result = await redis_client.ping()
+    assert result["connected"] is True
+
+
+@pytest.mark.asyncio
 async def test_has_session(redis_client):
     assert await redis_client.has_session("missing") is False
     await redis_client.save_competitors("session-2", [Competitor(name="Square")])

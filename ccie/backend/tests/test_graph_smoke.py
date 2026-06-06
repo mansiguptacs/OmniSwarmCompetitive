@@ -37,15 +37,16 @@ async def test_orchestrator_graph_full_run(orchestrator_graph):
     assert result["landscape_summary"]
 
 
-def test_health_endpoint():
+def test_health_endpoint(redis_client):
     from fastapi.testclient import TestClient
     from main import app
 
-    client = TestClient(app)
-    response = client.get("/health")
+    with TestClient(app) as client:
+        response = client.get("/health")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
     assert body["agent"] == "ccie_agent"
     assert "weave" in body
     assert "auto_score" in body
+    assert body["redis"]["connected"] is True
