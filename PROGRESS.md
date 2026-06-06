@@ -9,7 +9,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ B1 complete | LLM harness + heuristics; classifier/discovery via `llm/client.py` |
+| **Agents layer (backend)** | ✅ B2 complete | Real Tavily search + httpx scrape + LLM news/product parsing |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
 | **Playground UI (dev testing)** | ✅ Working | `ccie/playground/` — chat + `useCoAgent` state panel verified |
 | **Integration (chat UI)** | 🟡 Playground only | Production `ccie/frontend/` still owned by frontend teammate |
@@ -69,7 +69,11 @@
 
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **35 tests** — 34 passed, 1 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests -v`)
+- [x] **37 tests** — 37 passed, 2 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests -v`)
+
+### Real tools (B2 — 2026-06-06)
+- [x] Tavily web search when `ENV=prod` + `TAVILY_API_KEY` — news + products (no scraping)
+- [x] Tests: `test_tools_prod.py` (parser unit + optional live Tavily)
 
 ### LLM agent harness (B1 — 2026-06-06)
 - [x] `ccie/backend/llm/schemas.py` — `ClassifyResult`, `DiscoveryResult`, `SwotResult`
@@ -124,14 +128,14 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 ### B2 — Real tools (swap mocks for prod)
 | # | Task | Files / notes | Done |
 |---|---|---|---|
-| B2.1 | Finish Tavily integration in `web_search.py` (`ENV=prod`, `TAVILY_API_KEY`) | Already stubbed | ⬜ |
-| B2.2 | Implement real `web_scrape.py` — httpx + BeautifulSoup for pricing/features pages | Add `beautifulsoup4` to requirements | ⬜ |
-| B2.3 | News Scout: LLM parses raw search results → `list[NewsItem]` + sentiment | `agents/news_scout.py` | ⬜ |
-| B2.4 | Product Tracker: LLM structures scraped HTML → `list[ProductItem]` | `agents/product_tracker.py` | ⬜ |
+| B2.1 | Finish Tavily integration in `web_search.py` (`ENV=prod`, `TAVILY_API_KEY`) | `tools/web_search.py`, `USE_MOCK_TOOLS` override | ✅ |
+| B2.2 | Product/news intel via Tavily search only (no httpx scrape) | `tools/web_search.py` | ✅ |
+| B2.3 | News Scout uses search results directly | `agents/news_scout.py` | ✅ |
+| B2.4 | Product Tracker uses `search_products()` | `agents/product_tracker.py` | ✅ |
 | B2.5 | Bind `@tool` wrappers into LangGraph tool nodes (not just direct function calls) | Optional refactor for traceability | ⬜ |
-| B2.6 | Tests: keep mock path default; add `INTEGRATION=1` tool smoke tests | `tests/test_tools.py` | ⬜ |
+| B2.6 | Tests: keep mock path default; add `INTEGRATION=1` tool smoke tests | `tests/test_tools_prod.py` | ✅ |
 
-**Gate:** `ENV=prod` runs real search/scrape for Stripe demo.
+**Gate:** `ENV=prod` runs real search/scrape for Stripe demo. ✅ Run with `OPENAI_API_KEY` + `TAVILY_API_KEY`.
 
 ---
 
@@ -310,4 +314,4 @@ curl -H "Accept: application/json" http://localhost:8000/api/copilotkit/
 | 2026-06-06 | CopilotKit registry page verified — `ccie_agent` live at `:8000/api/copilotkit/` |
 | 2026-06-06 | Created this progress tracker |
 | 2026-06-06 | Added `ccie/playground/` — dev-only CopilotKit UI for backend testing (`ccie/frontend/` reserved) |
-| 2026-06-06 | Playground E2E working — AG-UI backend endpoint + `LangGraphHttpAgent` proxy; B6.1 gate passed |
+| 2026-06-06 | B2 complete — Tavily search, live scrape, LLM news/product parsing; 37 tests green |

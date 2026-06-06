@@ -1,8 +1,12 @@
+import logging
+
 from langchain_core.tools import tool
 
 from config import get_settings
-from state import NewsItem
+from state import NewsItem, ProductItem
 from tools.base import ToolResult
+
+logger = logging.getLogger(__name__)
 
 MOCK_STRIPE_NEWS = [
     NewsItem(
@@ -58,6 +62,42 @@ MOCK_COMPETITOR_NEWS = {
     ],
 }
 
+MOCK_PRODUCTS = {
+    "stripe": [
+        ProductItem(
+            name="Payments API",
+            description="Online payment processing for internet businesses.",
+            pricing="2.9% + 30¢ per transaction",
+        ),
+        ProductItem(
+            name="Billing",
+            description="Subscription and invoicing management.",
+            pricing="0.5% on recurring charges",
+        ),
+    ],
+    "paypal": [
+        ProductItem(
+            name="Checkout",
+            description="Consumer and merchant checkout solutions.",
+            pricing="2.99% + fixed fee",
+        ),
+    ],
+    "adyen": [
+        ProductItem(
+            name="Unified Commerce",
+            description="Enterprise payment platform for global brands.",
+            pricing="Custom enterprise pricing",
+        ),
+    ],
+    "square": [
+        ProductItem(
+            name="Square POS",
+            description="Point-of-sale hardware and software.",
+            pricing="2.6% + 10¢ per transaction",
+        ),
+    ],
+}
+
 
 def _mock_competitor_discovery_results(query_lower: str, max_results: int) -> list[NewsItem]:
     discovery_map = {
@@ -88,39 +128,77 @@ def _mock_competitor_discovery_results(query_lower: str, max_results: int) -> li
     ]
 
 
+def _mock_search(query: str, max_results: int) -> list[NewsItem]:
+    query_lower = query.lower()
+    if "competitor" in query_lower or "compete" in query_lower:
+        return _mock_competitor_discovery_results(query_lower, max_results)
+    if any(token in query_lower for token in ("product", "pricing", "plan", "feature")):
+        company_key = next((key for key in MOCK_PRODUCTS if key in query_lower), "stripe")
+        return [
+            NewsItem(
+                title=product.name,
+                url=f"https://example.com/{company_key}-{product.name.lower().replace(' ', '-')}",
+                summary=product.description,
+                sentiment=0.0,
+            )
+            for product in MOCK_PRODUCTS[company_key][:max_results]
+        ]
+    for key, items in MOCK_COMPETITOR_NEWS.items():
+        if key in query_lower:
+            return items[:max_results]
+    return MOCK_STRIPE_NEWS[:max_results]
+
+
+def _tavily_result_to_news_item(result: dict) -> NewsItem:
+    return NewsItem(
+        title=result.get("title", "") or "Untitled",
+        url=result.get("url", ""),
+        summary=result.get("content", "") or result.get("raw_content", "") or "",
+        sentiment=0.0,
+        published_at=str(result.get("published_date", "") or ""),
+    )
+
+
+def _search_hit_to_product(hit: NewsItem) -> ProductItem:
+    combined = f"{hit.title} {hit.summary}".strip()
+    pricing = "See source"
+    if any(symbol in combined for symbol in ("%", "$", "€", "£")):
+        pricing = hit.summary or hit.title
+    return ProductItem(
+        name=hit.title,
+        description=hit.summary,
+        pricing=pricing,
+    )
+
+
 class WebSearchTool:
     async def search(self, query: str, max_results: int = 5) -> list[NewsItem]:
         settings = get_settings()
         if settings.use_mock_tools:
-            query_lower = query.lower()
-            if "competitor" in query_lower or "compete" in query_lower:
-                return _mock_competitor_discovery_results(query_lower, max_results)
-            for key, items in MOCK_COMPETITOR_NEWS.items():
-                if key in query_lower:
-                    return items[:max_results]
-            return MOCK_STRIPE_NEWS[:max_results]
+            return _mock_search(query, max_results)
+
+        if not settings.TAVILY_API_KEY:
+            logger.warning("TAVILY_API_KEY not set — returning empty search results")
+            return []
 
         try:
             from langchain_community.tools.tavily_search import TavilySearchResults
 
-            if not settings.TAVILY_API_KEY:
-                return MOCK_STRIPE_NEWS[:max_results]
-
-            search = TavilySearchResults(max_results=max_results)
+            search = TavilySearchResults(
+                max_results=max_results,
+                api_key=settings.TAVILY_API_KEY,
+                include_answer=False,
+                include_raw_content=False,
+            )
             results = await search.ainvoke({"query": query})
-            news_items: list[NewsItem] = []
-            for result in results:
-                news_items.append(
-                    NewsItem(
-                        title=result.get("title", ""),
-                        url=result.get("url", ""),
-                        summary=result.get("content", ""),
-                        sentiment=0.0,
-                    )
-                )
-            return news_items
-        except Exception:
-            return MOCK_STRIPE_NEWS[:max_results]
+            if not results:
+                return []
+
+            news_items = [_tavily_result_to_news_item(result) for result in results]
+            return news_items[:max_results]
+        except Exception as exc:
+            logger.exception("Tavily search failed for query %r: %s", query, exc)
+            return []
 
 
 _web_search_tool = WebSearchTool()
@@ -130,8 +208,21 @@ async def search_news(query: str, max_results: int = 5) -> list[NewsItem]:
     return await _web_search_tool.search(query, max_results=max_results)
 
 
+async def search_products(company: str, max_results: int = 5) -> list[ProductItem]:
+    settings = get_settings()
+    company_key = company.lower().strip()
+    if settings.use_mock_tools:
+        return MOCK_PRODUCTS.get(company_key, MOCK_PRODUCTS["stripe"])[:max_results]
+
+    hits = await search_news(
+        f"{company} products pricing plans features",
+        max_results=max_results,
+    )
+    return [_search_hit_to_product(hit) for hit in hits]
+
+
 @tool
 async def web_search(query: str) -> str:
-    """Search recent news about a company or market topic."""
+    """Search the web for news, products, pricing, or competitive intelligence."""
     items = await search_news(query)
     return ToolResult(success=True, data=[item.model_dump() for item in items]).model_dump_json()

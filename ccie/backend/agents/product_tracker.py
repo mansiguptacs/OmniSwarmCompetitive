@@ -12,7 +12,7 @@ from state import (
     parse_competitor,
     set_competitors,
 )
-from tools.web_scrape import scrape_products
+from tools.web_search import search_products
 
 async def run_product_tracker(
     state: CCIEState,
@@ -27,7 +27,7 @@ async def run_product_tracker(
         time.time(),
     )
 
-    products = await scrape_products(competitor_name)
+    products = await search_products(competitor_name)
     competitors = get_competitors(state)
     index = find_competitor_index(state, competitor_name)
 
