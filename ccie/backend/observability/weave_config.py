@@ -1,15 +1,38 @@
+import logging
 import os
 
-import weave
-
 from config import get_settings
+from observability.env_loader import load_ccie_env
+
+logger = logging.getLogger(__name__)
 
 
-def init_weave() -> None:
-    settings = get_settings()
-    if os.getenv("WEAVE_DISABLED", "").lower() in ("1", "true", "yes"):
-        return
+def _weave_disabled() -> bool:
+    return os.getenv("WEAVE_DISABLED", "").lower() in ("1", "true", "yes")
+
+
+def init_weave() -> bool:
+    """Initialize W&B Weave. Returns True when tracing is active."""
+    load_ccie_env()
+
+    if _weave_disabled():
+        logger.info("Weave disabled (WEAVE_DISABLED=1)")
+        return False
+
+    if not os.getenv("WANDB_API_KEY"):
+        logger.warning(
+            "WANDB_API_KEY not set — Weave tracing skipped. "
+            "Set WANDB_API_KEY to enable observability dashboard."
+        )
+        return False
+
     try:
+        import weave
+
+        settings = get_settings()
         weave.init(settings.WEAVE_PROJECT)
-    except Exception:
-        pass
+        logger.info("Weave initialized for project %s", settings.WEAVE_PROJECT)
+        return True
+    except Exception as exc:
+        logger.warning("Weave init failed: %s", exc)
+        return False

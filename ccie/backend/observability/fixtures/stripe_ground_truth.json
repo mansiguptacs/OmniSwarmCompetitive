@@ -1,0 +1,7 @@
+{
+  "target_company": "Stripe",
+  "is_hypothetical": false,
+  "expected_competitors": ["PayPal", "Adyen", "Square"],
+  "required_keywords": ["payment", "paypal", "adyen", "square", "stripe"],
+  "min_competitor_count": 3
+}

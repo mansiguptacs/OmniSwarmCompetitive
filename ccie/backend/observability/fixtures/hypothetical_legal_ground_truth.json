@@ -1,0 +1,7 @@
+{
+  "target_company": "",
+  "is_hypothetical": true,
+  "expected_competitors": ["Kira Systems", "Luminance", "Harvey AI"],
+  "required_keywords": ["legal", "document", "ai", "law"],
+  "min_competitor_count": 2
+}
