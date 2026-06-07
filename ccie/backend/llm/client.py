@@ -8,6 +8,17 @@ from state import Competitor, NewsItem
 from tools.web_search import search_news
 
 
+def _build_hypothetical_queries(description: str, target_company: str) -> list[str]:
+    """Generate multiple search queries for a hypothetical company description."""
+    desc = (description or target_company or "")[:200].strip()
+    queries = [f"{desc} competitors"]
+    words = desc.split()
+    if len(words) > 3:
+        queries.append(f"startups {' '.join(words[:8])} market landscape")
+    queries.append(f"companies similar to {desc[:80]}")
+    return queries[:3]
+
+
 def _format_search_context(items: list[NewsItem]) -> str:
     if not items:
         return "No search results available."
@@ -43,12 +54,24 @@ async def discover_competitors_for_target(
     is_hypothetical: bool,
     description: str = "",
 ) -> DiscoveryResult:
-    search_query = (
-        f"{description[:120]} competitors"
-        if is_hypothetical
-        else f"{target_company} competitors"
-    )
-    search_results = await search_news(search_query, max_results=5)
+    if is_hypothetical:
+        search_queries = _build_hypothetical_queries(description, target_company)
+    else:
+        search_queries = [f"{target_company} competitors"]
+
+    import asyncio
+    search_tasks = [search_news(q, max_results=5) for q in search_queries]
+    all_results = await asyncio.gather(*search_tasks, return_exceptions=True)
+    search_results: list[NewsItem] = []
+    seen_titles: set[str] = set()
+    for batch in all_results:
+        if isinstance(batch, Exception):
+            continue
+        for item in batch:
+            key = item.title.lower().strip()
+            if key not in seen_titles:
+                seen_titles.add(key)
+                search_results.append(item)
 
     llm = get_llm()
     if llm is None:
@@ -60,14 +83,30 @@ async def discover_competitors_for_target(
         )
 
     structured = llm.with_structured_output(DiscoveryResult)
-    prompt = (
-        "Identify the top 3-5 direct competitors for competitive intelligence analysis.\n"
-        f"Target company: {target_company or 'N/A'}\n"
-        f"Hypothetical: {is_hypothetical}\n"
-        f"Description: {description or 'N/A'}\n\n"
-        f"Web search context:\n{_format_search_context(search_results)}\n\n"
-        "Return only the most relevant competitor company names."
-    )
+
+    if is_hypothetical:
+        prompt = (
+            "You are a competitive intelligence analyst.\n"
+            "A user is planning a startup or product. Based on their description, "
+            "identify the top 3-5 EXISTING companies that would be their most direct competitors.\n\n"
+            f"User's idea/description: {description}\n"
+            f"Working name (if any): {target_company or 'N/A'}\n\n"
+            "Think about:\n"
+            "1. What market/industry does this idea target?\n"
+            "2. What existing companies serve the same customer need?\n"
+            "3. Include both large incumbents and relevant startups.\n\n"
+            f"Web search context:\n{_format_search_context(search_results)}\n\n"
+            "Return the most relevant real competitor company names. "
+            "Do NOT include the user's hypothetical company itself."
+        )
+    else:
+        prompt = (
+            "Identify the top 3-5 direct competitors for competitive intelligence analysis.\n"
+            f"Target company: {target_company or 'N/A'}\n"
+            f"Description: {description or 'N/A'}\n\n"
+            f"Web search context:\n{_format_search_context(search_results)}\n\n"
+            "Return only the most relevant competitor company names."
+        )
     try:
         result = await structured.ainvoke([HumanMessage(content=prompt)])
         if isinstance(result, DiscoveryResult):

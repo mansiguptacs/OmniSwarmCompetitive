@@ -1,6 +1,6 @@
 # CCIE — Progress Tracker
 
-> Last updated: **2026-06-06** (evening)  
+> Last updated: **2026-06-06** (night)  
 > Reference: [`implementation_plan.md`](implementation_plan.md)
 
 ---
@@ -9,7 +9,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| **Agents layer (backend)** | ✅ B4 complete + Financial Analyst | Parallel swarms (news + product + finance), scoring, LLM SWOT, branched paths |
+| **Agents layer (backend)** | ✅ B4 complete + Financial Analyst + Scoring v2 | Parallel swarms, LLM financial extraction, relative quadrant scoring, hardened hypothetical path |
 | **Real tools + LLM** | ✅ Live | Tavily search + `OPENAI_API_KEY` for classify/discover/SWOT; company-agnostic discovery |
 | **Observability (Weave)** | ✅ Enhanced | 7 trace scorers, per-competitor detail, memory metrics, coverage + SWOT completeness tracking |
 | **Frontend (production)** | ⬜ Reserved | `ccie/frontend/` — owned by frontend teammate |
@@ -53,13 +53,13 @@
 - [x] `ccie/backend/agents/financial_analyst.py` — revenue, funding, market cap, growth per competitor
 - [x] `ccie/backend/agents/synthesis.py` — SWOT + landscape summary (includes financial context)
 - [x] `ccie/backend/agents/helpers.py` — classify, discover, safe state emit
-- [x] `ccie/backend/tools/financial_data.py` — Tavily financial search + regex extraction + mock data
+- [x] `ccie/backend/tools/financial_data.py` — Tavily financial search + LLM structured extraction (regex fallback) + mock data
 - [x] Tests: `test_news_scout.py`, `test_financial.py`, product/synthesis in `test_integration.py`
 
 ### Orchestrator graph
 - [x] `ccie/backend/agents/orchestrator.py` — classify → enrich/parse → discover → parallel analyze → synthesize
 - [x] `ccie/backend/agents/graph.py` — branched real/hypothetical paths + LangGraph `Send` fan-out
-- [x] `ccie/backend/agents/scoring.py` — `threat_level`, `market_size`, `market_overlap`, `market_quadrants`
+- [x] `ccie/backend/agents/scoring.py` — `threat_level`, `market_size`, `market_overlap`, `market_quadrants` (v2: financial signals + relative quadrant placement)
 - [x] State reset on new analysis (fixes stale competitors on same CopilotKit thread)
 - [x] Real company path (`Analyze Stripe`, `Analyze Apple`, `Analyze Palo Alto Networks`)
 - [x] Hypothetical path (long description → legal-tech competitors)
@@ -109,16 +109,23 @@
 - [x] Supports ISO (`2025-06-01`), named month (`January 15, 2025`), abbreviated (`Jun 3, 2025`)
 - [x] Tests: `test_date_extraction.py` (8 tests)
 
+### Agentic improvements (v2 — 2026-06-06 night)
+- [x] **LLM-powered financial extraction** — `FinancialResult` Pydantic schema, GPT-4o-mini structured output from Tavily snippets, regex fallback when LLM unavailable
+- [x] **Scoring v2** — `_financial_signals()` parses revenue/market cap/growth into size + momentum signals; threat/size/overlap now differentiate based on financials
+- [x] **Relative quadrant placement** — `compute_market_quadrants` uses avg threat/size to split competitors into leader/challenger/visionary/niche (no longer all "leader")
+- [x] **Hypothetical path hardening** — `_refine_hypothetical_description()` uses LLM to extract market context from vague startup ideas; multi-query search (`_build_hypothetical_queries`) for broader competitor discovery
+- [x] Tests: `test_scoring.py` (12 tests — parsing, signals, metrics differentiation, quadrant placement)
+
 ### End-to-end
 - [x] `ccie/backend/tests/test_integration.py` — full Stripe run + Redis session check
-- [x] **140 tests** — 140 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test pytest backend/tests observability/tests -v`)
+- [x] **152 tests** — 150 passed, 3 skipped (`WEAVE_DISABLED=1 ENV=test USE_MOCK_TOOLS=1 pytest backend/tests observability/tests -v`)
 
 ### Real tools (B2 — 2026-06-06)
 - [x] Tavily web search when `ENV=prod` + `TAVILY_API_KEY` — news + products (no scraping)
 - [x] Tests: `test_tools_prod.py` (parser unit + optional live Tavily)
 
 ### LLM agent harness (B1 — 2026-06-06)
-- [x] `ccie/backend/llm/schemas.py` — `ClassifyResult`, `DiscoveryResult`, `SwotResult`
+- [x] `ccie/backend/llm/schemas.py` — `ClassifyResult`, `DiscoveryResult`, `FinancialResult`, `SwotResult`
 - [x] `ccie/backend/llm/factory.py` — `get_llm()`, override injection for tests
 - [x] `ccie/backend/llm/heuristic.py` — fallback classify/discover logic
 - [x] `ccie/backend/llm/client.py` — async `classify_company`, `discover_competitors_for_target`
@@ -137,7 +144,7 @@
 | Checkpoint | Target | Status |
 |---|---|---|
 | Agent registry live | `localhost:8000/api/copilotkit/` shows `ccie_agent` | ✅ Verified 2026-06-06 |
-| pytest green | 140 passed, 3 skipped | ✅ Verified 2026-06-06 |
+| pytest green | 150 passed, 3 skipped | ✅ Verified 2026-06-06 |
 | Backend server | `uvicorn main:app --port 8000` | ✅ Running |
 | Real tools (Tavily) | Any company → relevant competitors + news | ✅ Verified (Stripe, Apple, PAN) |
 | OpenAI LLM path | classify + discover + SWOT via `gpt-4o-mini` | ✅ Verified 2026-06-06 |
@@ -317,7 +324,7 @@ Wire a proper LLM + structured-output layer so agents stop relying on hardcoded 
 | D3 | Buildings animate in as `state.competitors` grows | Frontend | ⬜ |
 | D4 | Click building → detail panel (SWOT, news, products) | Frontend | ⬜ |
 | D5 | Target company at center; distance = market overlap | Frontend | ⬜ |
-| D6 | Financial Analyst agent (stretch) | Agents | ⬜ |
+| D6 | Financial Analyst agent (stretch) | Agents | ✅ |
 | D7 | Vector search: "Which competitor is strongest in X?" | Infra | ⬜ |
 | D8 | Demo dry run — Stripe + one hypothetical company | All | ⬜ |
 
@@ -398,3 +405,7 @@ CCIE_AUTO_SCORE=1
 | 2026-06-06 | Fix: Tavily sometimes returns strings instead of dicts — guard in web_search + financial_data |
 | 2026-06-06 | Graceful Redis startup — `verify_redis_on_startup(strict=False)` so app starts without Docker |
 | 2026-06-06 | 140 tests green (backend + observability + financial + date extraction) |
+| 2026-06-06 | LLM-powered financial extraction — `FinancialResult` structured output, regex fallback |
+| 2026-06-06 | Scoring v2 — financial signals (revenue/growth), relative quadrant placement |
+| 2026-06-06 | Hypothetical path hardening — LLM description refinement + multi-query search |
+| 2026-06-06 | 150 tests green (added `test_scoring.py` 12 tests + new financial tests) |

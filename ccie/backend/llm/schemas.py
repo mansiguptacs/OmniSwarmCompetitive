@@ -13,6 +13,16 @@ class DiscoveryResult(BaseModel):
     reasoning: str = ""
 
 
+class FinancialResult(BaseModel):
+    revenue: str = ""
+    funding_total: str = ""
+    valuation: str = ""
+    market_cap: str = ""
+    growth_rate: str = ""
+    employee_count: str = ""
+    source: str = ""
+
+
 class SwotResult(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)

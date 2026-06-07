@@ -1,4 +1,4 @@
-"""Financial data tool — fetch revenue, funding, market cap via Tavily search."""
+"""Financial data tool — fetch revenue, funding, market cap via Tavily search + LLM extraction."""
 
 import logging
 import re
@@ -45,7 +45,7 @@ MOCK_FINANCIALS = {
 
 
 def _extract_financials_from_search(company: str, results: list[NewsItem]) -> dict:
-    """Parse financial figures from search result snippets."""
+    """Regex fallback: parse financial figures from search result snippets."""
     financials: dict = {"source": ""}
     text = " ".join(f"{r.title} {r.summary}" for r in results)
 
@@ -88,6 +88,45 @@ def _extract_financials_from_search(company: str, results: list[NewsItem]) -> di
         financials["growth_rate"] = f"{growth.group(1)}% YoY"
 
     return financials
+
+
+async def _llm_extract_financials(company: str, results: list[NewsItem]) -> dict:
+    """Use LLM structured output to extract financials from search snippets."""
+    from langchain_core.messages import HumanMessage
+    from llm.factory import get_llm
+    from llm.schemas import FinancialResult
+
+    llm = get_llm()
+    if llm is None:
+        return {}
+
+    context = "\n".join(
+        f"- [{r.title}]({r.url}): {r.summary[:300]}"
+        for r in results if r.summary
+    )
+    if not context.strip():
+        return {}
+
+    structured = llm.with_structured_output(FinancialResult)
+    prompt = (
+        f"Extract financial data for {company} from these search results.\n"
+        "Return empty string for any field you cannot find concrete data for.\n"
+        "Use the most recent figures available. Include currency and year where possible.\n\n"
+        f"Search results:\n{context}"
+    )
+    try:
+        result = await structured.ainvoke([HumanMessage(content=prompt)])
+        if isinstance(result, FinancialResult):
+            parsed = result
+        else:
+            parsed = FinancialResult.model_validate(result)
+        fin = {k: v for k, v in parsed.model_dump().items() if v}
+        if results:
+            fin.setdefault("source", results[0].url)
+        return fin
+    except Exception:
+        logger.debug("LLM financial extraction failed for %s", company, exc_info=True)
+        return {}
 
 
 async def search_financials(company: str) -> dict:
@@ -134,6 +173,11 @@ async def search_financials(company: str) -> dict:
                     url=r.get("url", ""),
                     summary=r.get("content", ""),
                 ))
+
+        llm_result = await _llm_extract_financials(company, news_items)
+        if llm_result and len(llm_result) > 1:
+            return llm_result
+
         return _extract_financials_from_search(company, news_items)
     except Exception as exc:
         logger.exception("Financial search failed for %r: %s", company, exc)

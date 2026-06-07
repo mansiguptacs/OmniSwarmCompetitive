@@ -59,13 +59,15 @@ async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
 
 @trace_node(name="parse_hypothetical")
 async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> dict:
-    description = state.get("target_description") or get_last_user_message(state)
+    raw_desc = state.get("target_description") or get_last_user_message(state)
     append_activity(
         state,
         "Orchestrator",
-        "Parsing hypothetical company description...",
+        "Analyzing hypothetical product/startup concept...",
         time.time(),
     )
+
+    description = await _refine_hypothetical_description(raw_desc)
 
     updates = {
         "target_description": description,
@@ -73,6 +75,36 @@ async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> d
     }
     await safe_emit_state(config, updates)
     return updates
+
+
+async def _refine_hypothetical_description(raw_input: str) -> str:
+    """Use LLM to extract structured market context from a vague startup idea."""
+    from llm.factory import get_llm
+    llm = get_llm()
+    if llm is None:
+        return raw_input
+
+    from langchain_core.messages import HumanMessage
+    prompt = (
+        "A user described a hypothetical startup or product idea. "
+        "Analyze it and produce a concise market-context description that covers:\n"
+        "1. The target market / industry\n"
+        "2. The core customer need being addressed\n"
+        "3. The product category (e.g., SaaS, marketplace, fintech, etc.)\n"
+        "4. Key features or differentiators mentioned\n\n"
+        f"User's description: {raw_input}\n\n"
+        "Write a single clear paragraph (3-5 sentences) that a competitive analyst "
+        "could use to identify real-world competitors. Do NOT invent details the user "
+        "didn't mention."
+    )
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        content = response.content
+        if isinstance(content, str) and len(content.strip()) > 20:
+            return content.strip()
+    except Exception:
+        pass
+    return raw_input
 
 
 @trace_node(name="discover_competitors")

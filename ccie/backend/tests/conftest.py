@@ -17,6 +17,7 @@ from state import AgentActivity, CCIEState, Competitor, NewsItem, default_ccie_s
 @pytest.fixture(autouse=True)
 def reset_memory_factory(monkeypatch):
     monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv("USE_MOCK_TOOLS", "1")
     monkeypatch.setenv("AUTO_INDEX_INTEL", "0")
     get_settings.cache_clear()
     reset_redis_memory()

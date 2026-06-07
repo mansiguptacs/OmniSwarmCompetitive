@@ -81,3 +81,28 @@ def test_mock_financials_coverage():
     for company, data in MOCK_FINANCIALS.items():
         assert "revenue" in data, f"{company} missing revenue"
         assert "source" in data, f"{company} missing source"
+
+
+@pytest.mark.asyncio
+async def test_llm_extract_financials_fallback():
+    """LLM extraction falls back gracefully when no LLM is available."""
+    from tools.financial_data import _llm_extract_financials
+    from state import NewsItem
+
+    items = [
+        NewsItem(
+            title="Acme revenue",
+            url="https://example.com/acme",
+            summary="Acme reported $5 billion in revenue.",
+        ),
+    ]
+    result = await _llm_extract_financials("Acme", items)
+    assert isinstance(result, dict)
+
+
+@pytest.mark.asyncio
+async def test_search_financials_llm_then_regex():
+    """Mock mode returns mock data regardless of LLM availability."""
+    result = await search_financials("PayPal")
+    assert result["revenue"] == "$29.8B (2023)"
+    assert result["growth_rate"] == "8% YoY"
