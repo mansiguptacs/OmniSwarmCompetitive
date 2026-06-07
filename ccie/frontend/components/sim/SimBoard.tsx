@@ -107,8 +107,9 @@ function IncumbentBuilding({
   );
 }
 
-function PlayerTower({ name }: { name: string }) {
+function PlayerTower({ name, onClick }: { name: string; onClick?: () => void }) {
   const beaconRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
   useFrame((state) => {
     if (beaconRef.current) {
       beaconRef.current.rotation.y = state.clock.elapsedTime * 0.8;
@@ -116,10 +117,30 @@ function PlayerTower({ name }: { name: string }) {
   });
   const height = 16;
   return (
-    <group position={[0, 0, 0]}>
+    <group
+      position={[0, 0, 0]}
+      onClick={
+        onClick
+          ? (e) => {
+              e.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+      onPointerOver={(e) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        document.body.style.cursor = "auto";
+      }}
+    >
       <mesh castShadow receiveShadow position={[0, height / 2, 0]}>
         <boxGeometry args={[3.4, height, 3.4]} />
-        <meshStandardMaterial color="#f5c451" emissive="#b8860b" emissiveIntensity={0.4} metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial color="#f5c451" emissive="#b8860b" emissiveIntensity={hovered ? 0.75 : 0.4} metalness={0.6} roughness={0.3} />
       </mesh>
       <mesh ref={beaconRef} position={[0, height + 1.3, 0]}>
         <octahedronGeometry args={[1, 0]} />
@@ -127,7 +148,7 @@ function PlayerTower({ name }: { name: string }) {
       </mesh>
       <Html position={[0, height + 3.2, 0]} center zIndexRange={[20, 0]}>
         <div className="label-chip" style={{ background: "#f5c451", color: "#1a1205" }}>
-          {name} (you)
+          {name} (you){onClick ? " · replay" : ""}
         </div>
       </Html>
     </group>
@@ -186,10 +207,12 @@ export function SimBoard({
   state,
   selected,
   onSelect,
+  onPlayerClick,
 }: {
   state: SimulationState | null;
   selected: string | null;
   onSelect: (name: string | null) => void;
+  onPlayerClick?: () => void;
 }) {
   const board = currentBoard(state);
   const positions = useMemo(() => companyPositions(board), [board]);
@@ -228,7 +251,7 @@ export function SimBoard({
 
       <Suspense fallback={null}>
         <Ground />
-        <PlayerTower name={playerName} />
+        <PlayerTower name={playerName} onClick={onPlayerClick} />
         {targetName && <TargetBuilding name={targetName} />}
         <AllianceLines pairs={pairs} positions={positions} />
         {companies.map((c) => (

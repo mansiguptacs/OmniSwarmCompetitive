@@ -21,6 +21,12 @@ from typing import Callable
 
 from llm.factory import get_llm
 from simulation.engine import run_iteration
+from simulation.ledger import (
+    assemble_replay,
+    build_choice_entry,
+    build_persona_entries,
+    build_recommendation_entry,
+)
 from simulation.persona_builder import build_personas
 from simulation.roster import DEFAULT_SECTOR, get_sector
 from simulation.schemas import (
@@ -88,9 +94,15 @@ async def start_simulation(
     )
 
     move = initial_move or f"{player_company} acquires {target_name}"
+    # Seed the ledger: personas (the agents' baseline) + the opening move.
+    await store.append_ledger(session_id, build_persona_entries(state))
+    await store.append_ledger(
+        session_id, [build_choice_entry(session_id, 1, player_company, move)]
+    )
     await run_iteration(state, move, store=store, llm_getter=llm_getter)
     if state.status == "complete" and not state.final_recommendation:
         state.final_recommendation = await final_report(state, llm_getter=llm_getter)
+        await store.append_ledger(session_id, [build_recommendation_entry(state)])
     await store.save_state(state)
     return state
 
@@ -114,9 +126,15 @@ async def advance_simulation(
         return state
 
     move = _resolve_move(state, choice)
+    player_name = state.player.company if state.player else "player"
+    await store.append_ledger(
+        session_id,
+        [build_choice_entry(session_id, state.current_index + 1, player_name, move)],
+    )
     await run_iteration(state, move, store=store, llm_getter=llm_getter)
     if state.status == "complete" and not state.final_recommendation:
         state.final_recommendation = await final_report(state, llm_getter=llm_getter)
+        await store.append_ledger(session_id, [build_recommendation_entry(state)])
     await store.save_state(state)
     return state
 
@@ -145,8 +163,23 @@ async def end_simulation(
     state.status = "complete"
     if not state.final_recommendation:
         state.final_recommendation = await final_report(state, llm_getter=llm_getter)
+        await store.append_ledger(session_id, [build_recommendation_entry(state)])
     await store.save_state(state)
     return state
+
+
+async def get_replay(
+    session_id: str,
+    *,
+    store: SimulationStore | None = None,
+) -> dict | None:
+    """Assemble the click-to-audit replay bundle (Redis ledger + state)."""
+    store = store or get_sim_store()
+    state = await store.get_state(session_id)
+    if state is None:
+        return None
+    ledger = await store.get_ledger(session_id)
+    return assemble_replay(state, ledger)
 
 
 async def fork_simulation(

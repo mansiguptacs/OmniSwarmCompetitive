@@ -18,6 +18,7 @@ from simulation.session import (
     advance_simulation,
     end_simulation,
     fork_simulation,
+    get_replay,
     get_simulation,
     start_simulation,
 )
@@ -110,3 +111,11 @@ async def sim_end(session_id: str) -> SimulationState:
     if state is None:
         raise HTTPException(status_code=404, detail="session not found")
     return state
+
+
+@router.get("/replay/{session_id}")
+async def sim_replay(session_id: str) -> dict:
+    bundle = await get_replay(session_id)
+    if bundle is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return bundle

@@ -15,7 +15,12 @@ from __future__ import annotations
 import json
 import re
 
-from simulation.schemas import CompanyPersona, GroundingPacket, SimulationState
+from simulation.schemas import (
+    CompanyPersona,
+    GroundingPacket,
+    LedgerEntry,
+    SimulationState,
+)
 
 _KEY_PREFIX = "ccie:sim"
 
@@ -118,6 +123,38 @@ class SimulationStore:
             return GroundingPacket.model_validate(json.loads(raw))
         except Exception:
             return None
+
+    # --- Decision ledger (the agents' auditable repository) -----------------
+
+    def _ledger_key(self, session_id: str) -> str:
+        return f"{_KEY_PREFIX}:ledger:{slugify(session_id)}"
+
+    async def append_ledger(self, session_id: str, entries: list[LedgerEntry]) -> bool:
+        if not entries:
+            return True
+        try:
+            client = await self._get_client()
+            await client.rpush(
+                self._ledger_key(session_id),
+                *[json.dumps(e.model_dump()) for e in entries],
+            )
+            return True
+        except Exception:
+            return False
+
+    async def get_ledger(self, session_id: str) -> list[LedgerEntry]:
+        try:
+            client = await self._get_client()
+            raw = await client.lrange(self._ledger_key(session_id), 0, -1)
+            entries: list[LedgerEntry] = []
+            for item in raw or []:
+                try:
+                    entries.append(LedgerEntry.model_validate(json.loads(item)))
+                except Exception:
+                    continue
+            return entries
+        except Exception:
+            return []
 
     async def ping(self) -> bool:
         try:

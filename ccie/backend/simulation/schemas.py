@@ -95,6 +95,7 @@ class AgentReaction(BaseModel):
     ally_with: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     weave_trace_id: str = ""
+    weave_url: str = ""
     redis_key: str = ""
 
 
@@ -179,6 +180,8 @@ class SimulationIteration(BaseModel):
     chosen_option: str = ""
     grounding: GroundingPacket | None = None
     score: IterationScore | None = None
+    weave_trace_id: str = ""
+    weave_url: str = ""
 
 
 class ReactionDraft(BaseModel):

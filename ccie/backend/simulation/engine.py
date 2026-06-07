@@ -15,8 +15,10 @@ from typing import Awaitable, Callable
 from llm.factory import get_llm
 from simulation.agents import gather_reactions, gather_reactions_two_pass
 from simulation.grounding import gather_grounding
+from simulation.ledger import build_iteration_entries
 from simulation.referee import adjudicate
 from simulation.scoring import recommend_option, score_board
+from simulation.tracing import trace_adjudication, trace_reasoning
 from simulation.schemas import (
     BoardState,
     CompanyBoardPosition,
@@ -123,6 +125,28 @@ async def run_iteration(
         decision.recommended_option_id = rec_id
         decision.recommendation_rationale = rec_reason
 
+    # Best-effort Weave traces (the "why") — one per iteration, shared by its cards.
+    reasoning_id, reasoning_url = trace_reasoning(
+        {
+            "session_id": state.session_id,
+            "iteration": index,
+            "move": move,
+            "reactions": [r.model_dump() for r in reactions],
+        }
+    )
+    adj_id, adj_url = trace_adjudication(
+        {
+            "session_id": state.session_id,
+            "iteration": index,
+            "move": move,
+            "outcome": outcome,
+            "board": new_board.model_dump(),
+        }
+    )
+    for r in reactions:
+        r.weave_trace_id = reasoning_id
+        r.weave_url = reasoning_url
+
     iteration = SimulationIteration(
         index=index,
         move=move,
@@ -132,9 +156,18 @@ async def run_iteration(
         decision_point=decision,
         grounding=grounding,
         score=score,
+        weave_trace_id=adj_id,
+        weave_url=adj_url,
     )
 
     state.iterations.append(iteration)
     state.current_index = index
     state.status = "complete" if index >= state.max_iterations else "awaiting_choice"
+
+    # Write the canonical ledger entries (the "what") to Redis.
+    if store is not None:
+        await store.append_ledger(
+            state.session_id, build_iteration_entries(state.session_id, iteration)
+        )
+
     return iteration

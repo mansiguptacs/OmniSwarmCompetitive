@@ -21,6 +21,7 @@ import {
   SetupForm,
   Timeline,
 } from "@/components/sim/panels";
+import { ReplayModal } from "@/components/sim/ReplayModal";
 
 const SimBoard = dynamic(() => import("@/components/sim/SimBoard").then((m) => m.SimBoard), {
   ssr: false,
@@ -64,6 +65,7 @@ export default function SimulatePage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [branchFrom, setBranchFrom] = useState<number | null>(null);
+  const [showReplay, setShowReplay] = useState(false);
 
   // Resume an in-progress session from the URL (?s=) or localStorage on load.
   useEffect(() => {
@@ -160,7 +162,12 @@ export default function SimulatePage() {
 
   return (
     <main style={{ position: "relative", height: "100vh", width: "100vw", overflow: "hidden" }}>
-      <SimBoard state={state} selected={selected} onSelect={setSelected} />
+      <SimBoard
+        state={state}
+        selected={selected}
+        onSelect={setSelected}
+        onPlayerClick={state ? () => setShowReplay(true) : undefined}
+      />
 
       {/* Top bar */}
       <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", gap: 12, pointerEvents: "none" }}>
@@ -173,6 +180,15 @@ export default function SimulatePage() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {state && <Timeline state={state} onBranchFrom={(t) => setBranchFrom(t)} />}
+          {state && (
+            <button
+              onClick={() => setShowReplay(true)}
+              className="glass"
+              style={{ padding: "8px 14px", pointerEvents: "auto", color: "#f5c451", fontSize: 13, cursor: "pointer", fontWeight: 700 }}
+            >
+              ▷ Replay
+            </button>
+          )}
           {state && (
             <button
               onClick={handleNewGame}
@@ -248,6 +264,10 @@ export default function SimulatePage() {
             </div>
           )}
         </>
+      )}
+
+      {showReplay && state?.session_id && (
+        <ReplayModal sessionId={state.session_id} onClose={() => setShowReplay(false)} />
       )}
     </main>
   );

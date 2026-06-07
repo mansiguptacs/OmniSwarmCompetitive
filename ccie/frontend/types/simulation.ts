@@ -69,6 +69,7 @@ export interface AgentReaction {
   ally_with?: string[];
   evidence?: Evidence[];
   weave_trace_id?: string;
+  weave_url?: string;
   redis_key?: string;
 }
 
@@ -136,6 +137,48 @@ export interface SimulationIteration {
   chosen_option?: string;
   grounding?: GroundingPacket | null;
   score?: IterationScore | null;
+  weave_trace_id?: string;
+  weave_url?: string;
+}
+
+export interface ReplayReaction {
+  actor: string;
+  intent?: string;
+  action?: string;
+  rationale?: string;
+  intensity?: number;
+  ally_with?: string[];
+  evidence?: Evidence[];
+  weave_trace_id?: string;
+  weave_url?: string;
+}
+
+export interface ReplayTurn {
+  index: number;
+  move?: string;
+  chosen_option?: string;
+  referee_outcome?: string;
+  board?: BoardState;
+  score?: IterationScore | null;
+  weave_url?: string;
+  reactions?: ReplayReaction[];
+  decision?: DecisionPoint | null;
+}
+
+export interface ReplayBundle {
+  session_id: string;
+  player?: PlayerProfile | null;
+  target?: AcquisitionTarget | null;
+  personas?: CompanyPersona[];
+  status?: SimStatus;
+  current_index?: number;
+  max_iterations?: number;
+  final_recommendation?: string;
+  parent_session_id?: string;
+  branched_from_index?: number;
+  turns?: ReplayTurn[];
+  ledger?: LedgerEntry[];
+  ledger_source?: string;
 }
 
 export interface LedgerEntry {
