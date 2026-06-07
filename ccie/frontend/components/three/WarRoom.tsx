@@ -90,6 +90,7 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
   );
 
   const occupiedLots = useMemo(() => buildOccupiedSet(positions), [positions]);
+  const competitorNames = useMemo(() => competitors.map(c => c.name), [competitors]);
 
   return (
     <Canvas
@@ -146,6 +147,7 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
           active={hasTarget}
           competitorCount={competitors.length}
           occupiedLots={occupiedLots}
+          competitorNames={competitorNames}
         />
 
         <SFLandmarks />
