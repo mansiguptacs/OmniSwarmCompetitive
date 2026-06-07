@@ -27,9 +27,8 @@ async def run_financial_analyst(
 ) -> dict:
     session_id = ensure_session_id(state)
     append_activity(
-        state,
-        "Financial Analyst",
-        f"Researching financials for {competitor_name}...",
+        state, "Financial Analyst",
+        f"Analyzing financial profile for {competitor_name} — extracting revenue, funding, valuation, and growth metrics...",
         time.time(),
     )
 
@@ -49,7 +48,22 @@ async def run_financial_analyst(
         except Exception:
             logger.debug("Memory persist failed for financial_analyst/%s", competitor_name, exc_info=True)
 
-    await safe_emit_state(config, {"competitors": state["competitors"]})
+    has_data = financials is not None
+    fin_summary = ""
+    if has_data and financials:
+        parts = []
+        if getattr(financials, "revenue", None):
+            parts.append(f"revenue {financials.revenue}")
+        if getattr(financials, "funding_total", None):
+            parts.append(f"funding {financials.funding_total}")
+        fin_summary = f" — found {', '.join(parts)}" if parts else " — limited data available"
+    append_activity(
+        state, "Financial Analyst",
+        f"Financial analysis complete for {competitor_name}{fin_summary}",
+        time.time(),
+    )
+
+    await safe_emit_state(config, {"competitors": state["competitors"], "agent_activity": state["agent_activity"]})
 
     return {
         "competitors": state["competitors"],

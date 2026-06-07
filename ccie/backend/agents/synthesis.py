@@ -26,12 +26,24 @@ async def run_synthesis(
     competitor_name: str | None = None,
     landscape: bool = False,
 ) -> dict:
-    append_activity(
-        state,
-        "Synthesis",
-        "Generating competitive insights...",
-        time.time(),
-    )
+    if landscape:
+        append_activity(
+            state, "Synthesis",
+            "Synthesizing landscape — scoring competitors, computing quadrants, and generating executive summary...",
+            time.time(),
+        )
+    elif competitor_name:
+        append_activity(
+            state, "Synthesis",
+            f"Running SWOT analysis for {competitor_name} — evaluating strengths, weaknesses, opportunities, and threats...",
+            time.time(),
+        )
+    else:
+        append_activity(
+            state, "Synthesis",
+            "Generating competitive insights...",
+            time.time(),
+        )
 
     updates: dict = {"agent_activity": state["agent_activity"]}
     session_id = state.get("session_id", "")

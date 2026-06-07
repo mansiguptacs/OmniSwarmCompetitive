@@ -25,9 +25,8 @@ async def run_product_tracker(
 ) -> dict:
     session_id = ensure_session_id(state)
     append_activity(
-        state,
-        "Product Tracker",
-        f"Analyzing products for {competitor_name}...",
+        state, "Product Tracker",
+        f"Mapping product portfolio for {competitor_name} — identifying key offerings, pricing tiers, and feature sets...",
         time.time(),
     )
 
@@ -48,7 +47,14 @@ async def run_product_tracker(
         except Exception:
             logger.debug("Memory persist failed for product_tracker/%s", competitor_name, exc_info=True)
 
-    await safe_emit_state(config, {"competitors": state["competitors"]})
+    n = len(products)
+    append_activity(
+        state, "Product Tracker",
+        f"Product analysis done for {competitor_name}: {n} product{'s' if n != 1 else ''} identified",
+        time.time(),
+    )
+
+    await safe_emit_state(config, {"competitors": state["competitors"], "agent_activity": state["agent_activity"]})
 
     return {
         "competitors": state["competitors"],

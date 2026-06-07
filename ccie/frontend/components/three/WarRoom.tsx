@@ -41,7 +41,6 @@ function buildOccupiedSet(positions: [number, number][]): Set<string> {
 export function WarRoom({ target, hypothetical, competitors, selected, onSelect }: Props) {
   const hasTarget = target.trim().length > 0;
 
-  // Sort indices by threat (highest first) so top threats get inner spiral lots
   const threatRanks = useMemo(() => {
     const indexed = competitors.map((c, i) => ({ i, threat: c.threat_level ?? 0.5 }));
     indexed.sort((a, b) => b.threat - a.threat);
@@ -79,13 +78,13 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
 
       <fog attach="fog" args={["#e0ecf8", 120, 250]} />
 
-      <OrthographicCamera makeDefault position={[40, 36, 40]} zoom={14} near={-300} far={600} />
+      <OrthographicCamera makeDefault position={[50, 42, 50]} zoom={11} near={-300} far={600} />
       <OrbitControls
         enablePan
         enableDamping
         dampingFactor={0.08}
-        minZoom={6}
-        maxZoom={60}
+        minZoom={4}
+        maxZoom={50}
         maxPolarAngle={Math.PI / 2.2}
         target={[0, 4, 0]}
       />
@@ -107,13 +106,14 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
       <directionalLight position={[-20, 30, -10]} intensity={0.45} color="#b3d4fc" />
 
       <Suspense fallback={null}>
+        {/* City is always visible — skyline in idle, shrinks when data arrives */}
         <CityGround
           active={hasTarget}
           competitorCount={competitors.length}
           occupiedLots={occupiedLots}
         />
 
-        {hasTarget && <SFLandmarks />}
+        <SFLandmarks />
 
         {hasTarget && positions.length > 0 && <Roads positions={positions} />}
 

@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 
 const BLOCK = 9;
 const STREET = 2.8;
@@ -16,16 +18,7 @@ function mulberry32(seed: number) {
   };
 }
 
-/* ── Filler buildings ────────────────────────────────────────── */
-
-interface FillerBuilding {
-  x: number;
-  z: number;
-  w: number;
-  h: number;
-  d: number;
-  color: string;
-}
+/* ── Animated filler building ────────────────────────────────── */
 
 const FILLER_COLORS = [
   "#ddd5c8", "#d8cfc2", "#dbd0c0",
@@ -36,33 +29,84 @@ const FILLER_COLORS = [
   "#c8ccd5", "#d0c8cc",
 ];
 
-function FillerBuildings({ gridRadius, occupiedSet }: { gridRadius: number; occupiedSet: Set<string> }) {
-  const buildings = useMemo<FillerBuilding[]>(() => {
+interface FillerDef {
+  x: number;
+  z: number;
+  w: number;
+  skylineH: number;
+  shrunkH: number;
+  d: number;
+  color: string;
+}
+
+function AnimatedFiller({ def, shrink }: { def: FillerDef; shrink: boolean }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const targetH = shrink ? def.shrunkH : def.skylineH;
+
+  useFrame((_, delta) => {
+    if (!ref.current) return;
+    const cur = ref.current.scale.y;
+    const diff = targetH / def.skylineH - cur;
+    if (Math.abs(diff) > 0.001) {
+      const next = cur + diff * Math.min(1, delta * 2.5);
+      ref.current.scale.y = next;
+      ref.current.position.y = (def.skylineH * next) / 2;
+    }
+  });
+
+  return (
+    <mesh
+      ref={ref}
+      position={[def.x, def.skylineH / 2, def.z]}
+      castShadow
+      receiveShadow
+    >
+      <boxGeometry args={[def.w, def.skylineH, def.d]} />
+      <meshStandardMaterial color={def.color} roughness={0.85} metalness={0.02} />
+    </mesh>
+  );
+}
+
+function FillerBuildings({
+  gridRadius,
+  occupiedSet,
+  shrink,
+}: {
+  gridRadius: number;
+  occupiedSet: Set<string>;
+  shrink: boolean;
+}) {
+  const buildings = useMemo<FillerDef[]>(() => {
     const rand = mulberry32(777);
-    const out: FillerBuilding[] = [];
+    const out: FillerDef[] = [];
 
     for (let gx = -gridRadius; gx <= gridRadius; gx++) {
       for (let gz = -gridRadius; gz <= gridRadius; gz++) {
         if (gx === 0 && gz === 0) continue;
-        const key = `${gx},${gz}`;
-        if (occupiedSet.has(key)) continue;
 
         const cx = gx * CELL;
         const cz = gz * CELL;
         const dist = Math.hypot(cx, cz);
         if (dist > (gridRadius + 0.5) * CELL) continue;
 
+        const isOccupied = occupiedSet.has(`${gx},${gz}`);
         const count = 1 + Math.floor(rand() * 3);
+
         for (let b = 0; b < count; b++) {
           const w = 1.0 + rand() * 2.0;
           const d = 1.0 + rand() * 2.0;
-          const h = 0.8 + rand() * 5.0;
+          const distFactor = 1 - Math.min(dist / ((gridRadius + 1) * CELL), 1);
+          const skylineH = 2.5 + rand() * 8.0 + distFactor * 6.0;
+          const shrunkH = isOccupied ? 0.3 + rand() * 0.5 : 0.8 + rand() * 3.5;
           const ox = (rand() - 0.5) * (BLOCK - w - 0.4);
           const oz = (rand() - 0.5) * (BLOCK - d - 0.4);
           out.push({
             x: cx + ox,
             z: cz + oz,
-            w, h, d,
+            w,
+            skylineH,
+            shrunkH,
+            d,
             color: FILLER_COLORS[Math.floor(rand() * FILLER_COLORS.length)],
           });
         }
@@ -74,14 +118,7 @@ function FillerBuildings({ gridRadius, occupiedSet }: { gridRadius: number; occu
   return (
     <group>
       {buildings.map((b, i) => (
-        <mesh key={i} position={[b.x, b.h / 2, b.z]} castShadow receiveShadow>
-          <boxGeometry args={[b.w, b.h, b.d]} />
-          <meshStandardMaterial
-            color={b.color}
-            roughness={0.85}
-            metalness={0.02}
-          />
-        </mesh>
+        <AnimatedFiller key={i} def={b} shrink={shrink} />
       ))}
     </group>
   );
@@ -201,25 +238,26 @@ interface Props {
 }
 
 export function CityGround({ active, competitorCount = 0, occupiedLots }: Props) {
-  const gridRadius = active ? Math.max(3, Math.ceil(Math.sqrt(competitorCount + 1)) + 1) : 2;
+  const gridRadius = Math.max(3, Math.ceil(Math.sqrt(Math.max(competitorCount, 4) + 1)) + 1);
   const groundSize = (gridRadius + 1) * CELL * 2 + 20;
   const occupied = occupiedLots ?? new Set<string>();
 
   return (
     <group>
+      {/* Ground terrain — always sandy city ground */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[groundSize, groundSize]} />
-        <meshStandardMaterial
-          color={active ? "#e8e2d6" : "#8cb878"}
-          roughness={0.95}
-          metalness={0}
-        />
+        <meshStandardMaterial color="#e8e2d6" roughness={0.95} metalness={0} />
       </mesh>
 
-      {active && <StreetGrid gridRadius={gridRadius} />}
-      {active && <FillerBuildings gridRadius={gridRadius} occupiedSet={occupied} />}
-      {active && <Parks gridRadius={gridRadius} />}
-      {active && <BayWater extent={gridRadius * CELL} />}
+      <StreetGrid gridRadius={gridRadius} />
+      <FillerBuildings
+        gridRadius={gridRadius}
+        occupiedSet={occupied}
+        shrink={active}
+      />
+      <Parks gridRadius={gridRadius} />
+      <BayWater extent={gridRadius * CELL} />
     </group>
   );
 }

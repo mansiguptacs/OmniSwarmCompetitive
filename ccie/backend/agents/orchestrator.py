@@ -24,7 +24,11 @@ async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
     session_id = str(uuid.uuid4())
 
     state["agent_activity"] = []
-    append_activity(state, "Orchestrator", "Classifying company input...", time.time())
+    append_activity(
+        state, "Orchestrator",
+        f"Classifying input — determining if '{user_text[:60]}' is a real company or hypothetical concept...",
+        time.time(),
+    )
 
     updates = {
         "phase": "classifying",
@@ -44,7 +48,11 @@ async def classify_node(state: CCIEState, config: RunnableConfig) -> dict:
 @trace_node(name="enrich_real")
 async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
     target = state.get("target_company", "")
-    append_activity(state, "Orchestrator", f"Enriching profile for {target}...", time.time())
+    append_activity(
+        state, "Orchestrator",
+        f"Enriching company profile — gathering overview data and market context for {target}...",
+        time.time(),
+    )
 
     overview = await search_news(f"{target} company overview", max_results=1)
     description = overview[0].summary if overview else f"Established company: {target}"
@@ -61,9 +69,8 @@ async def enrich_real_node(state: CCIEState, config: RunnableConfig) -> dict:
 async def parse_hypothetical_node(state: CCIEState, config: RunnableConfig) -> dict:
     raw_desc = state.get("target_description") or get_last_user_message(state)
     append_activity(
-        state,
-        "Orchestrator",
-        "Analyzing hypothetical product/startup concept...",
+        state, "Orchestrator",
+        f"Parsing hypothetical concept — extracting target market, product category, and differentiators from description...",
         time.time(),
     )
 
@@ -109,7 +116,12 @@ async def _refine_hypothetical_description(raw_input: str) -> str:
 
 @trace_node(name="discover_competitors")
 async def discover_competitors_node(state: CCIEState, config: RunnableConfig) -> dict:
-    append_activity(state, "Orchestrator", "Discovering competitors...", time.time())
+    target_label = state.get("target_company") or "target"
+    append_activity(
+        state, "Orchestrator",
+        f"Searching market landscape — identifying direct and indirect competitors for {target_label}...",
+        time.time(),
+    )
 
     discovery = await discover_competitors_for_target(
         state.get("target_company", ""),
@@ -117,10 +129,9 @@ async def discover_competitors_node(state: CCIEState, config: RunnableConfig) ->
         state.get("target_description", ""),
     )
 
-    target_label = state.get("target_company") or "target"
     competitors: list[Competitor] = []
 
-    for name in discovery.competitors:
+    for idx, name in enumerate(discovery.competitors):
         competitors.append(
             Competitor(
                 name=name,
@@ -130,9 +141,8 @@ async def discover_competitors_node(state: CCIEState, config: RunnableConfig) ->
         )
         set_competitors(state, competitors)
         append_activity(
-            state,
-            "Orchestrator",
-            f"Discovered competitor: {name}",
+            state, "Orchestrator",
+            f"Found competitor {idx + 1}/{len(discovery.competitors)}: {name} — queuing for deep analysis...",
             time.time(),
         )
         await safe_emit_state(

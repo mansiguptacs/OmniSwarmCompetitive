@@ -1,5 +1,3 @@
-@import "@copilotkit/react-ui/styles.css";
-
 :root {
   --bg: #060912;
   --bg-soft: #0a0e17;
@@ -57,10 +55,34 @@ a {
   user-select: none;
 }
 
-/* CopilotKit chat fills its container */
-.copilotKitChat,
-.copilotKitWindow {
-  height: 100%;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 16px currentColor;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 ::-webkit-scrollbar {

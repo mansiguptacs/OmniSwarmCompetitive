@@ -26,9 +26,8 @@ async def run_news_scout(
     target = competitor_name or state.get("target_company", "")
     session_id = ensure_session_id(state)
     append_activity(
-        state,
-        "News Scout",
-        f"Scanning {target} for latest news...",
+        state, "News Scout",
+        f"Scanning news sources for {target} — searching recent articles, press releases, and market signals...",
         time.time(),
     )
 
@@ -54,7 +53,18 @@ async def run_news_scout(
     except Exception:
         logger.debug("Memory persist failed for news_scout/%s", target, exc_info=True)
 
-    await safe_emit_state(config, {"competitors": state["competitors"]})
+    n = len(news_items)
+    sentiment_tag = ""
+    if news_items:
+        avg = sum(item.sentiment for item in news_items) / n
+        sentiment_tag = f" — avg sentiment {'positive' if avg > 0.1 else 'negative' if avg < -0.1 else 'neutral'}"
+    append_activity(
+        state, "News Scout",
+        f"Completed news scan for {target}: {n} article{'s' if n != 1 else ''} collected{sentiment_tag}",
+        time.time(),
+    )
+
+    await safe_emit_state(config, {"competitors": state["competitors"], "agent_activity": state["agent_activity"]})
 
     return {
         "competitors": state["competitors"],
