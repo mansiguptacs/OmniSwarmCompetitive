@@ -38,6 +38,19 @@ export async function advanceSimulation(
   return asJson<SimulationState>(res);
 }
 
+export async function forkSimulation(
+  sessionId: string,
+  fromIndex: number,
+  choice: string,
+): Promise<SimulationState> {
+  const res = await fetch("/api/sim/fork", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, from_index: fromIndex, choice }),
+  });
+  return asJson<SimulationState>(res);
+}
+
 export async function getSimulation(sessionId: string): Promise<SimulationState> {
   const res = await fetch(`/api/sim/state/${encodeURIComponent(sessionId)}`);
   return asJson<SimulationState>(res);

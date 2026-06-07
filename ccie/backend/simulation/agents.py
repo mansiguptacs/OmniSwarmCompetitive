@@ -15,12 +15,15 @@ from typing import Callable
 from langchain_core.messages import HumanMessage
 
 from llm.factory import get_llm
+from simulation.grounding import grounding_context
 from simulation.guardrails import ensure_grounded
 from simulation.schemas import (
     AcquisitionTarget,
     AgentReaction,
     BoardState,
     CompanyPersona,
+    Evidence,
+    GroundingPacket,
     PlayerProfile,
     ReactionDraft,
 )
@@ -60,10 +63,23 @@ def _board_summary(board: BoardState) -> str:
     return "; ".join(parts)
 
 
+def _reaction_evidence(
+    persona: CompanyPersona, grounding: GroundingPacket | None
+) -> list[Evidence]:
+    """Prefer fresh, move-specific signals about this company; fall back to persona."""
+    evidence: list[Evidence] = []
+    if grounding is not None:
+        evidence.extend(grounding.per_company.get(persona.name, [])[:2])
+    if len(evidence) < 2:
+        evidence.extend(persona.sources[: 2 - len(evidence)])
+    return evidence
+
+
 def _heuristic_reaction(
     persona: CompanyPersona,
     move: str,
     target: AcquisitionTarget | None,
+    grounding: GroundingPacket | None = None,
 ) -> AgentReaction:
     action, intensity = TEMPERAMENT_PLAYBOOK.get(
         persona.temperament, ("Assess the situation and respond measuredly", 0.5)
@@ -80,7 +96,7 @@ def _heuristic_reaction(
         action=action,
         rationale=rationale,
         intensity=_clamp01(intensity),
-        evidence=persona.sources[:2],
+        evidence=_reaction_evidence(persona, grounding),
     )
 
 
@@ -91,16 +107,19 @@ async def react_as_ceo(
     *,
     target: AcquisitionTarget | None = None,
     player: PlayerProfile | None = None,
+    grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> AgentReaction:
     """Produce one CEO-agent's reaction to the player's move."""
     llm = llm_getter()
     if llm is None:
-        return ensure_grounded(_heuristic_reaction(persona, move, target), persona)
+        return ensure_grounded(_heuristic_reaction(persona, move, target, grounding), persona)
 
     structured = llm.with_structured_output(ReactionDraft)
     target_name = target.name if target else "a smaller startup"
     player_name = player.company if player else "the acquirer"
+    signals = grounding_context(grounding, persona.name)
+    signals_block = f"\n{signals}\n" if signals else ""
     prompt = (
         f"You ARE the CEO of {persona.name}. Stay fully in character.\n"
         f"Strategy: {persona.strategy_thesis}\n"
@@ -110,11 +129,14 @@ async def react_as_ceo(
         f"Financial firepower: {persona.financial_firepower}\n\n"
         f"Situation: {player_name} just made this move: \"{move}\" "
         f"(acquiring/affecting {target_name}).\n"
-        f"Current board: {_board_summary(board)}\n\n"
-        "As this CEO, decide how your company responds. Be realistic and consistent "
-        "with who you are. Provide: intent (your goal), action (the concrete move you "
-        "make), rationale (why, grounded in your real strategy/position), and intensity "
-        "(0.0-1.0, how forcefully you respond)."
+        f"Current board: {_board_summary(board)}\n"
+        f"{signals_block}\n"
+        "As this CEO, decide how your company responds. Ground your reasoning in the "
+        "fresh market signals above when relevant. Be realistic and consistent with "
+        "who you are. Calibrate intensity honestly: only a genuine existential threat "
+        "warrants a near-1.0 response — most moves merit a measured 0.3-0.7.\n"
+        "Provide: intent (your goal), action (the concrete move you make), rationale "
+        "(why, grounded in your real strategy and the signals), and intensity (0.0-1.0)."
     )
     try:
         result = await structured.ainvoke([HumanMessage(content=prompt)])
@@ -127,13 +149,13 @@ async def react_as_ceo(
                 rationale=draft.rationale,
                 intensity=_clamp01(draft.intensity),
                 ally_with=draft.ally_with,
-                evidence=persona.sources[:2],
+                evidence=_reaction_evidence(persona, grounding),
             ),
             persona,
         )
     except Exception:
         logger.debug("LLM reaction failed for %s", persona.name, exc_info=True)
-        return ensure_grounded(_heuristic_reaction(persona, move, target), persona)
+        return ensure_grounded(_heuristic_reaction(persona, move, target, grounding), persona)
 
 
 async def gather_reactions(
@@ -143,6 +165,7 @@ async def gather_reactions(
     *,
     target: AcquisitionTarget | None = None,
     player: PlayerProfile | None = None,
+    grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> list[AgentReaction]:
     """All CEO-agents react concurrently (first pass — independent)."""
@@ -155,6 +178,7 @@ async def gather_reactions(
                     board,
                     target=target,
                     player=player,
+                    grounding=grounding,
                     llm_getter=llm_getter,
                 )
                 for persona in personas
@@ -205,13 +229,20 @@ async def revise_reaction(
     *,
     target: AcquisitionTarget | None = None,
     player: PlayerProfile | None = None,
+    grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> AgentReaction:
     """Second pass: the CEO adjusts after seeing rivals' first-pass moves."""
     own = next((r for r in first_pass if r.actor == persona.name), None)
     if own is None:
         own = await react_as_ceo(
-            persona, move, board, target=target, player=player, llm_getter=llm_getter
+            persona,
+            move,
+            board,
+            target=target,
+            player=player,
+            grounding=grounding,
+            llm_getter=llm_getter,
         )
     others = [r for r in first_pass if r.actor != persona.name]
 
@@ -241,7 +272,7 @@ async def revise_reaction(
                 rationale=draft.rationale or own.rationale,
                 intensity=_clamp01(draft.intensity),
                 ally_with=draft.ally_with,
-                evidence=persona.sources[:2],
+                evidence=_reaction_evidence(persona, grounding),
             ),
             persona,
         )
@@ -257,11 +288,18 @@ async def gather_reactions_two_pass(
     *,
     target: AcquisitionTarget | None = None,
     player: PlayerProfile | None = None,
+    grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> list[AgentReaction]:
     """Two-pass interaction: agents react, then revise after seeing each other."""
     first_pass = await gather_reactions(
-        personas, move, board, target=target, player=player, llm_getter=llm_getter
+        personas,
+        move,
+        board,
+        target=target,
+        player=player,
+        grounding=grounding,
+        llm_getter=llm_getter,
     )
     second_pass = await asyncio.gather(
         *(
@@ -272,6 +310,7 @@ async def gather_reactions_two_pass(
                 first_pass,
                 target=target,
                 player=player,
+                grounding=grounding,
                 llm_getter=llm_getter,
             )
             for persona in personas

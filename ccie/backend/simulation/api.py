@@ -17,6 +17,7 @@ from simulation.schemas import SimulationState
 from simulation.session import (
     advance_simulation,
     end_simulation,
+    fork_simulation,
     get_simulation,
     start_simulation,
 )
@@ -37,6 +38,12 @@ class StartRequest(BaseModel):
 
 class AdvanceRequest(BaseModel):
     session_id: str
+    choice: str
+
+
+class ForkRequest(BaseModel):
+    session_id: str
+    from_index: int
     choice: str
 
 
@@ -74,6 +81,19 @@ async def sim_advance(req: AdvanceRequest) -> SimulationState:
     except Exception as exc:
         logger.exception("sim advance failed")
         raise HTTPException(status_code=500, detail=f"advance failed: {exc}") from exc
+
+
+@router.post("/fork", response_model=SimulationState)
+async def sim_fork(req: ForkRequest) -> SimulationState:
+    if not req.choice.strip():
+        raise HTTPException(status_code=400, detail="choice is required")
+    try:
+        return await fork_simulation(req.session_id, req.from_index, req.choice.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("sim fork failed")
+        raise HTTPException(status_code=500, detail=f"fork failed: {exc}") from exc
 
 
 @router.get("/state/{session_id}", response_model=SimulationState)

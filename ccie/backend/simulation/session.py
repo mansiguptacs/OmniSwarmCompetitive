@@ -28,6 +28,7 @@ from simulation.schemas import (
     PlayerProfile,
     SimulationState,
 )
+from simulation.scoring import final_report
 from simulation.store import SimulationStore, get_sim_store
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,9 @@ async def start_simulation(
     )
 
     move = initial_move or f"{player_company} acquires {target_name}"
-    await run_iteration(state, move, llm_getter=llm_getter)
+    await run_iteration(state, move, store=store, llm_getter=llm_getter)
+    if state.status == "complete" and not state.final_recommendation:
+        state.final_recommendation = await final_report(state, llm_getter=llm_getter)
     await store.save_state(state)
     return state
 
@@ -111,7 +114,9 @@ async def advance_simulation(
         return state
 
     move = _resolve_move(state, choice)
-    await run_iteration(state, move, llm_getter=llm_getter)
+    await run_iteration(state, move, store=store, llm_getter=llm_getter)
+    if state.status == "complete" and not state.final_recommendation:
+        state.final_recommendation = await final_report(state, llm_getter=llm_getter)
     await store.save_state(state)
     return state
 
@@ -130,6 +135,7 @@ async def end_simulation(
     session_id: str,
     *,
     store: SimulationStore | None = None,
+    llm_getter: Callable[[], object] = get_llm,
 ) -> SimulationState | None:
     """Mark a session complete early (user ends the game)."""
     store = store or get_sim_store()
@@ -137,5 +143,47 @@ async def end_simulation(
     if state is None:
         return None
     state.status = "complete"
+    if not state.final_recommendation:
+        state.final_recommendation = await final_report(state, llm_getter=llm_getter)
     await store.save_state(state)
     return state
+
+
+async def fork_simulation(
+    session_id: str,
+    from_index: int,
+    choice: str,
+    *,
+    store: SimulationStore | None = None,
+    llm_getter: Callable[[], object] = get_llm,
+) -> SimulationState:
+    """Backtrack to an earlier turn and explore an alternate branch.
+
+    Creates a NEW session that copies the original up to (and including) iteration
+    `from_index`, then applies `choice` as the move for the next turn — letting the
+    exec compare "what if I'd chosen differently" without losing the original run.
+    """
+    store = store or get_sim_store()
+    original = await store.get_state(session_id)
+    if original is None:
+        raise ValueError(f"No simulation found for session {session_id!r}")
+    if from_index < 1 or from_index >= len(original.iterations):
+        raise ValueError(
+            f"from_index {from_index} out of range (1..{len(original.iterations) - 1})"
+        )
+
+    branch = original.model_copy(deep=True)
+    branch.session_id = uuid.uuid4().hex
+    branch.parent_session_id = session_id
+    branch.branched_from_index = from_index
+    branch.iterations = branch.iterations[:from_index]
+    branch.current_index = from_index
+    branch.status = "awaiting_choice"
+    branch.final_recommendation = ""
+
+    move = _resolve_move(branch, choice)
+    await run_iteration(branch, move, store=store, llm_getter=llm_getter)
+    if branch.status == "complete" and not branch.final_recommendation:
+        branch.final_recommendation = await final_report(branch, llm_getter=llm_getter)
+    await store.save_state(branch)
+    return branch

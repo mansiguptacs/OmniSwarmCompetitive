@@ -134,6 +134,39 @@ class DecisionPoint(BaseModel):
     situation_summary: str = ""
     options: list[DecisionOption] = Field(default_factory=list)
     allow_free_text: bool = True
+    recommended_option_id: str = ""
+    recommendation_rationale: str = ""
+
+
+class IterationScore(BaseModel):
+    """Quantified outcome of one iteration for the player (Phase 7).
+
+    `composite` in [0,1] blends position (good), momentum (good), and risk (bad).
+    `delta` is the change vs. the previous iteration's composite (+ = improving).
+    """
+
+    position: float = 0.5
+    momentum: float = 0.0
+    risk: float = 0.0
+    composite: float = 0.5
+    delta: float = 0.0
+
+
+class GroundingPacket(BaseModel):
+    """Fresh, real-world signals fetched for one iteration (Phase 6).
+
+    Built per iteration from targeted live lookups, cached in Redis with a TTL.
+    Fed into the agent + referee prompts and attached to the iteration so the UI
+    can show "what real info drove this." `stale=True` means live data was sparse
+    and the run degraded gracefully (never hallucinated)."""
+
+    iteration_index: int = 0
+    move: str = ""
+    summary: str = ""
+    evidence: list[Evidence] = Field(default_factory=list)
+    per_company: dict[str, list[Evidence]] = Field(default_factory=dict)
+    fetched_at: float = Field(default_factory=time.time)
+    stale: bool = False
 
 
 class SimulationIteration(BaseModel):
@@ -144,6 +177,8 @@ class SimulationIteration(BaseModel):
     board: BoardState = Field(default_factory=BoardState)
     decision_point: DecisionPoint | None = None
     chosen_option: str = ""
+    grounding: GroundingPacket | None = None
+    score: IterationScore | None = None
 
 
 class ReactionDraft(BaseModel):
@@ -213,3 +248,6 @@ class SimulationState(BaseModel):
     max_iterations: int = 10
     status: SimStatus = "setup"
     final_recommendation: str = ""
+    # Branch lineage (Phase 7): set when this session was forked from another.
+    parent_session_id: str = ""
+    branched_from_index: int = 0

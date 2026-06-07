@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 
-from simulation.schemas import CompanyPersona, SimulationState
+from simulation.schemas import CompanyPersona, GroundingPacket, SimulationState
 
 _KEY_PREFIX = "ccie:sim"
 
@@ -89,6 +89,33 @@ class SimulationStore:
             if not raw:
                 return None
             return SimulationState.model_validate(json.loads(raw))
+        except Exception:
+            return None
+
+    # --- Grounding packets (TTL cache for freshness) -----------------------
+
+    def _grounding_key(self, cache_key: str) -> str:
+        return f"{_KEY_PREFIX}:grounding:{slugify(cache_key)}"
+
+    async def save_grounding(self, cache_key: str, packet: GroundingPacket, ttl: int) -> bool:
+        try:
+            client = await self._get_client()
+            await client.set(
+                self._grounding_key(cache_key),
+                json.dumps(packet.model_dump()),
+                ex=max(1, int(ttl)),
+            )
+            return True
+        except Exception:
+            return False
+
+    async def get_grounding(self, cache_key: str) -> GroundingPacket | None:
+        try:
+            client = await self._get_client()
+            raw = await client.get(self._grounding_key(cache_key))
+            if not raw:
+                return None
+            return GroundingPacket.model_validate(json.loads(raw))
         except Exception:
             return None
 

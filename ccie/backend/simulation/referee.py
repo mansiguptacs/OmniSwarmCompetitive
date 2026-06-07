@@ -17,12 +17,14 @@ from typing import Callable
 from langchain_core.messages import HumanMessage
 
 from llm.factory import get_llm
+from simulation.grounding import grounding_context
 from simulation.schemas import (
     AcquisitionTarget,
     AgentReaction,
     BoardState,
     DecisionOption,
     DecisionPoint,
+    GroundingPacket,
     PlayerProfile,
     RefereeDraft,
 )
@@ -192,6 +194,7 @@ async def adjudicate(
     *,
     target: AcquisitionTarget | None = None,
     player: PlayerProfile | None = None,
+    grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> tuple[str, BoardState, DecisionPoint]:
     """Resolve reactions into (outcome_summary, new_board, decision_point)."""
@@ -201,11 +204,15 @@ async def adjudicate(
 
     structured = llm.with_structured_output(RefereeDraft)
     company_names = ", ".join(c.name for c in board.companies) or "none"
+    signals = grounding_context(grounding)
+    signals_block = f"Fresh market context:\n{signals}\n\n" if signals else ""
     prompt = (
         "You are a neutral market referee in an M&A war-game. Resolve how the "
-        "competitors' reactions interact and update the board.\n\n"
+        "competitors' reactions interact and update the board. Keep outcomes "
+        "plausible against the companies' real capabilities and the fresh context.\n\n"
         f"Player move: \"{move}\"\n"
         f"Companies on the board: {company_names}\n"
+        f"{signals_block}"
         f"Reactions:\n{_reactions_text(reactions)}\n\n"
         "Return: outcome_summary (2-3 sentences on what happened and how moves "
         "interacted); per-company new absolute scores 0..1 for market_position, "

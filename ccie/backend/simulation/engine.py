@@ -10,11 +10,13 @@ multi-turn loop.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Awaitable, Callable
 
 from llm.factory import get_llm
 from simulation.agents import gather_reactions, gather_reactions_two_pass
+from simulation.grounding import gather_grounding
 from simulation.referee import adjudicate
+from simulation.scoring import recommend_option, score_board
 from simulation.schemas import (
     BoardState,
     CompanyBoardPosition,
@@ -23,6 +25,11 @@ from simulation.schemas import (
     SimulationIteration,
     SimulationState,
 )
+from simulation.store import SimulationStore
+from state import NewsItem
+from tools.web_search import search_news
+
+SearchFn = Callable[[str, int], Awaitable[list[NewsItem]]]
 
 
 def init_board(personas: list[CompanyPersona]) -> BoardState:
@@ -48,6 +55,9 @@ async def run_iteration(
     move: str,
     *,
     interactive: bool = True,
+    search: SearchFn = search_news,
+    store: SimulationStore | None = None,
+    ground: bool = True,
     llm_getter: Callable[[], object] = get_llm,
 ) -> SimulationIteration:
     """Run one iteration against the current state and record it.
@@ -56,11 +66,28 @@ async def run_iteration(
     to each other (alliances, escalation). Set `interactive=False` for a single,
     independent pass.
 
+    A fresh `GroundingPacket` (real-world signals for this move/roster) is fetched
+    and fed into the agent + referee prompts, then recorded on the iteration so the
+    UI can show "what real info drove this." Pass `store` to enable the Redis TTL
+    cache; `ground=False` skips grounding entirely (used by some unit tests).
+
     Mutates `state` (appends the iteration, advances index/status) and returns the
     newly created `SimulationIteration`.
     """
     index = state.current_index + 1
     board = current_board(state)
+
+    grounding = None
+    if ground:
+        grounding = await gather_grounding(
+            move,
+            [p.name for p in state.personas],
+            target=state.target,
+            player=state.player,
+            iteration_index=index,
+            search=search,
+            store=store,
+        )
 
     reactor = gather_reactions_two_pass if interactive else gather_reactions
     reactions = await reactor(
@@ -69,6 +96,7 @@ async def run_iteration(
         board,
         target=state.target,
         player=state.player,
+        grounding=grounding,
         llm_getter=llm_getter,
     )
 
@@ -79,8 +107,21 @@ async def run_iteration(
         index,
         target=state.target,
         player=state.player,
+        grounding=grounding,
         llm_getter=llm_getter,
     )
+
+    # Score the new board (delta vs. the previous iteration's score).
+    prev_score = state.iterations[-1].score if state.iterations else None
+    score = score_board(new_board, prev_score)
+
+    # Recommend the strongest next option (unless this is the final turn).
+    if decision is not None and decision.options and index < state.max_iterations:
+        rec_id, rec_reason = await recommend_option(
+            new_board, decision.options, move=move, llm_getter=llm_getter
+        )
+        decision.recommended_option_id = rec_id
+        decision.recommendation_rationale = rec_reason
 
     iteration = SimulationIteration(
         index=index,
@@ -89,6 +130,8 @@ async def run_iteration(
         referee_outcome=outcome,
         board=new_board,
         decision_point=decision,
+        grounding=grounding,
+        score=score,
     )
 
     state.iterations.append(iteration)

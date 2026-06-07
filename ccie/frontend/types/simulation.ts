@@ -104,6 +104,26 @@ export interface DecisionPoint {
   situation_summary?: string;
   options?: DecisionOption[];
   allow_free_text?: boolean;
+  recommended_option_id?: string;
+  recommendation_rationale?: string;
+}
+
+export interface IterationScore {
+  position?: number;
+  momentum?: number;
+  risk?: number;
+  composite?: number;
+  delta?: number;
+}
+
+export interface GroundingPacket {
+  iteration_index?: number;
+  move?: string;
+  summary?: string;
+  evidence?: Evidence[];
+  per_company?: Record<string, Evidence[]>;
+  fetched_at?: number;
+  stale?: boolean;
 }
 
 export interface SimulationIteration {
@@ -114,6 +134,8 @@ export interface SimulationIteration {
   board?: BoardState;
   decision_point?: DecisionPoint | null;
   chosen_option?: string;
+  grounding?: GroundingPacket | null;
+  score?: IterationScore | null;
 }
 
 export interface LedgerEntry {
@@ -140,4 +162,6 @@ export interface SimulationState {
   max_iterations?: number;
   status?: SimStatus;
   final_recommendation?: string;
+  parent_session_id?: string;
+  branched_from_index?: number;
 }
