@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Callable
 
 from llm.factory import get_llm
-from simulation.agents import gather_reactions
+from simulation.agents import gather_reactions, gather_reactions_two_pass
 from simulation.referee import adjudicate
 from simulation.schemas import (
     BoardState,
@@ -47,9 +47,14 @@ async def run_iteration(
     state: SimulationState,
     move: str,
     *,
+    interactive: bool = True,
     llm_getter: Callable[[], object] = get_llm,
 ) -> SimulationIteration:
     """Run one iteration against the current state and record it.
+
+    With `interactive=True` (default), agents react in two passes so they respond
+    to each other (alliances, escalation). Set `interactive=False` for a single,
+    independent pass.
 
     Mutates `state` (appends the iteration, advances index/status) and returns the
     newly created `SimulationIteration`.
@@ -57,7 +62,8 @@ async def run_iteration(
     index = state.current_index + 1
     board = current_board(state)
 
-    reactions = await gather_reactions(
+    reactor = gather_reactions_two_pass if interactive else gather_reactions
+    reactions = await reactor(
         state.personas,
         move,
         board,

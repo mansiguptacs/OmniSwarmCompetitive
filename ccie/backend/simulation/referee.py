@@ -41,10 +41,13 @@ def _clamp_signed(v: float) -> float:
 def _reactions_text(reactions: list[AgentReaction]) -> str:
     if not reactions:
         return "No competitor reacted."
-    return "\n".join(
-        f"- {r.actor}: {r.action} (intensity {r.intensity:.2f}) — {r.rationale[:160]}"
-        for r in reactions
-    )
+    lines = []
+    for r in reactions:
+        ally = f" [allies with {', '.join(r.ally_with)}]" if r.ally_with else ""
+        lines.append(
+            f"- {r.actor}: {r.action} (intensity {r.intensity:.2f}){ally} — {r.rationale[:160]}"
+        )
+    return "\n".join(lines)
 
 
 def _heuristic_adjudicate(
@@ -60,6 +63,7 @@ def _heuristic_adjudicate(
     total_intensity = sum(r.intensity for r in reactions) or 0.0
     avg_intensity = total_intensity / len(reactions) if reactions else 0.0
 
+    alliance_pairs = 0
     for company in new_board.companies:
         reaction = by_actor.get(company.name)
         if reaction is None:
@@ -70,12 +74,27 @@ def _heuristic_adjudicate(
         company.market_position = _clamp01(
             company.market_position + (reaction.intensity - 0.5) * 0.05
         )
+        # Record alliances bidirectionally on the board.
+        if reaction.ally_with:
+            alliance_pairs += len(reaction.ally_with)
+            for ally in reaction.ally_with:
+                if ally not in company.alliances:
+                    company.alliances.append(ally)
+                partner = next(
+                    (c for c in new_board.companies if c.name == ally), None
+                )
+                if partner is not None and company.name not in partner.alliances:
+                    partner.alliances.append(company.name)
 
     # The player's move meets resistance proportional to total reaction intensity.
     resistance = avg_intensity
-    new_board.player.risk = _clamp01(new_board.player.risk + resistance * 0.25)
+    # Coordinated rivals (alliances) apply extra, harder-to-counter pressure.
+    coordination_penalty = min(0.2, alliance_pairs * 0.05)
+    new_board.player.risk = _clamp01(
+        new_board.player.risk + resistance * 0.25 + coordination_penalty
+    )
     new_board.player.momentum = _clamp_signed(
-        new_board.player.momentum + (0.25 - resistance * 0.3)
+        new_board.player.momentum + (0.25 - resistance * 0.3) - coordination_penalty
     )
     new_board.player.position = _clamp01(
         new_board.player.position + (0.1 - resistance * 0.12)
@@ -84,11 +103,15 @@ def _heuristic_adjudicate(
     strongest = max(reactions, key=lambda r: r.intensity, default=None)
     target_name = target.name if target else "the target"
     if strongest is not None:
+        alliance_note = (
+            " Rivals are coordinating against the move." if alliance_pairs else ""
+        )
         outcome = (
             f"After \"{move}\", {len(reactions)} rivals responded. "
             f"{strongest.actor} pushed back hardest ({strongest.action}). "
             f"Resistance to the {target_name} play is "
             f"{'high' if resistance > 0.6 else 'moderate' if resistance > 0.35 else 'low'}."
+            f"{alliance_note}"
         )
     else:
         outcome = f"After \"{move}\", rivals stayed quiet — an open window for the {target_name} play."
@@ -147,6 +170,20 @@ def _apply_llm_deltas(board: BoardState, draft: RefereeDraft) -> BoardState:
     return new_board
 
 
+def _record_alliances(board: BoardState, reactions: list[AgentReaction]) -> None:
+    by_name = {c.name: c for c in board.companies}
+    for reaction in reactions:
+        company = by_name.get(reaction.actor)
+        if company is None:
+            continue
+        for ally in reaction.ally_with:
+            if ally not in company.alliances:
+                company.alliances.append(ally)
+            partner = by_name.get(ally)
+            if partner is not None and company.name not in partner.alliances:
+                partner.alliances.append(company.name)
+
+
 async def adjudicate(
     move: str,
     reactions: list[AgentReaction],
@@ -180,6 +217,7 @@ async def adjudicate(
         result = await structured.ainvoke([HumanMessage(content=prompt)])
         draft = result if isinstance(result, RefereeDraft) else RefereeDraft.model_validate(result)
         new_board = _apply_llm_deltas(board, draft)
+        _record_alliances(new_board, reactions)
         options = draft.options or _heuristic_adjudicate(
             move, reactions, board, iteration_index, target
         )[2].options

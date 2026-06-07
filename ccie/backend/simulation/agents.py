@@ -15,6 +15,7 @@ from typing import Callable
 from langchain_core.messages import HumanMessage
 
 from llm.factory import get_llm
+from simulation.guardrails import ensure_grounded
 from simulation.schemas import (
     AcquisitionTarget,
     AgentReaction,
@@ -23,6 +24,11 @@ from simulation.schemas import (
     PlayerProfile,
     ReactionDraft,
 )
+
+# Above this average rival intensity, second-pass agents adjust (escalate/ally).
+_INTERACTION_THRESHOLD = 0.6
+_ESCALATE = {"aggressive", "acquisitive"}
+_DEFENSIVE = {"partner_first", "wait_and_see"}
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +96,7 @@ async def react_as_ceo(
     """Produce one CEO-agent's reaction to the player's move."""
     llm = llm_getter()
     if llm is None:
-        return _heuristic_reaction(persona, move, target)
+        return ensure_grounded(_heuristic_reaction(persona, move, target), persona)
 
     structured = llm.with_structured_output(ReactionDraft)
     target_name = target.name if target else "a smaller startup"
@@ -113,17 +119,21 @@ async def react_as_ceo(
     try:
         result = await structured.ainvoke([HumanMessage(content=prompt)])
         draft = result if isinstance(result, ReactionDraft) else ReactionDraft.model_validate(result)
-        return AgentReaction(
-            actor=persona.name,
-            intent=draft.intent,
-            action=draft.action,
-            rationale=draft.rationale,
-            intensity=_clamp01(draft.intensity),
-            evidence=persona.sources[:2],
+        return ensure_grounded(
+            AgentReaction(
+                actor=persona.name,
+                intent=draft.intent,
+                action=draft.action,
+                rationale=draft.rationale,
+                intensity=_clamp01(draft.intensity),
+                ally_with=draft.ally_with,
+                evidence=persona.sources[:2],
+            ),
+            persona,
         )
     except Exception:
         logger.debug("LLM reaction failed for %s", persona.name, exc_info=True)
-        return _heuristic_reaction(persona, move, target)
+        return ensure_grounded(_heuristic_reaction(persona, move, target), persona)
 
 
 async def gather_reactions(
@@ -135,7 +145,7 @@ async def gather_reactions(
     player: PlayerProfile | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> list[AgentReaction]:
-    """All CEO-agents react concurrently."""
+    """All CEO-agents react concurrently (first pass — independent)."""
     return list(
         await asyncio.gather(
             *(
@@ -151,3 +161,120 @@ async def gather_reactions(
             )
         )
     )
+
+
+def _others_text(others: list[AgentReaction]) -> str:
+    if not others:
+        return "No other competitor has moved."
+    return "\n".join(
+        f"- {r.actor}: {r.action} (intensity {r.intensity:.2f})" for r in others
+    )
+
+
+def _heuristic_revise(
+    persona: CompanyPersona,
+    first: AgentReaction,
+    others: list[AgentReaction],
+) -> AgentReaction:
+    if not others:
+        return first
+    avg_other = sum(r.intensity for r in others) / len(others)
+    if avg_other < _INTERACTION_THRESHOLD:
+        return first
+
+    revised = first.model_copy(deep=True)
+    if persona.temperament in _ESCALATE:
+        # Rivals are moving hard — escalate to avoid being outpaced.
+        revised.intensity = _clamp01(first.intensity + 0.1)
+        revised.action = f"Escalate: {first.action}"
+        revised.intent = f"Outpace aggressive rivals after the move ({persona.name})"
+    elif persona.temperament in _DEFENSIVE:
+        # Under pressure, seek a defensive alliance with the strongest rival.
+        ally = max(others, key=lambda r: r.intensity).actor
+        revised.ally_with = [ally]
+        revised.action = f"Form a defensive alliance with {ally}"
+        revised.intent = f"Share competitive pressure via an alliance ({persona.name})"
+    return revised
+
+
+async def revise_reaction(
+    persona: CompanyPersona,
+    move: str,
+    board: BoardState,
+    first_pass: list[AgentReaction],
+    *,
+    target: AcquisitionTarget | None = None,
+    player: PlayerProfile | None = None,
+    llm_getter: Callable[[], object] = get_llm,
+) -> AgentReaction:
+    """Second pass: the CEO adjusts after seeing rivals' first-pass moves."""
+    own = next((r for r in first_pass if r.actor == persona.name), None)
+    if own is None:
+        own = await react_as_ceo(
+            persona, move, board, target=target, player=player, llm_getter=llm_getter
+        )
+    others = [r for r in first_pass if r.actor != persona.name]
+
+    llm = llm_getter()
+    if llm is None:
+        return ensure_grounded(_heuristic_revise(persona, own, others), persona)
+
+    structured = llm.with_structured_output(ReactionDraft)
+    prompt = (
+        f"You ARE the CEO of {persona.name} ({persona.temperament}). "
+        "You already drafted a response; now you see how rivals are reacting and may "
+        "adjust (escalate, hold, counter-bid, or form an alliance).\n\n"
+        f"Player move: \"{move}\"\n"
+        f"Your first-pass action: {own.action} (intensity {own.intensity:.2f})\n"
+        f"Rivals' moves:\n{_others_text(others)}\n\n"
+        "Return your possibly-revised intent, action, rationale, intensity (0-1), and "
+        "ally_with (names of rivals you'd ally with, or empty). Stay in character."
+    )
+    try:
+        result = await structured.ainvoke([HumanMessage(content=prompt)])
+        draft = result if isinstance(result, ReactionDraft) else ReactionDraft.model_validate(result)
+        return ensure_grounded(
+            AgentReaction(
+                actor=persona.name,
+                intent=draft.intent or own.intent,
+                action=draft.action or own.action,
+                rationale=draft.rationale or own.rationale,
+                intensity=_clamp01(draft.intensity),
+                ally_with=draft.ally_with,
+                evidence=persona.sources[:2],
+            ),
+            persona,
+        )
+    except Exception:
+        logger.debug("LLM revise failed for %s", persona.name, exc_info=True)
+        return ensure_grounded(_heuristic_revise(persona, own, others), persona)
+
+
+async def gather_reactions_two_pass(
+    personas: list[CompanyPersona],
+    move: str,
+    board: BoardState,
+    *,
+    target: AcquisitionTarget | None = None,
+    player: PlayerProfile | None = None,
+    llm_getter: Callable[[], object] = get_llm,
+) -> list[AgentReaction]:
+    """Two-pass interaction: agents react, then revise after seeing each other."""
+    first_pass = await gather_reactions(
+        personas, move, board, target=target, player=player, llm_getter=llm_getter
+    )
+    second_pass = await asyncio.gather(
+        *(
+            revise_reaction(
+                persona,
+                move,
+                board,
+                first_pass,
+                target=target,
+                player=player,
+                llm_getter=llm_getter,
+            )
+            for persona in personas
+        )
+    )
+    return list(second_pass)

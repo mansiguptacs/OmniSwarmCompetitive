@@ -92,6 +92,7 @@ class AgentReaction(BaseModel):
     action: str = ""
     rationale: str = ""
     intensity: float = 0.5
+    ally_with: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     weave_trace_id: str = ""
     redis_key: str = ""
@@ -152,6 +153,7 @@ class ReactionDraft(BaseModel):
     action: str = ""
     rationale: str = ""
     intensity: float = 0.5
+    ally_with: list[str] = Field(default_factory=list)
 
 
 class CompanyDelta(BaseModel):
