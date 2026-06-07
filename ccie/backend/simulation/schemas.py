@@ -41,6 +41,22 @@ class CompanyPersona(BaseModel):
     sources: list[Evidence] = Field(default_factory=list)
 
 
+class PersonaDraft(BaseModel):
+    """LLM structured-output target for persona distillation (no citations).
+
+    Evidence/citations are attached separately from the real search hits so the
+    model can't invent sources.
+    """
+
+    strategy_thesis: str = ""
+    ethos: str = ""
+    m_and_a_history: list[str] = Field(default_factory=list)
+    financial_firepower: str = ""
+    temperament: Temperament = "wait_and_see"
+    recent_moves: list[str] = Field(default_factory=list)
+    leadership_style: str = ""
+
+
 class AcquisitionTarget(BaseModel):
     """The smaller startup the player wants to acquire."""
 
