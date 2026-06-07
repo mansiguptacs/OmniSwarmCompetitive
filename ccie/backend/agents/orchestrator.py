@@ -164,9 +164,15 @@ async def discover_competitors_node(state: CCIEState, config: RunnableConfig) ->
 
 @trace_node(name="analyze_competitor")
 async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> dict:
+    import asyncio
+
     name = state.get("competitor_name", "")
     if not name:
         return {}
+
+    idx = state.get("competitor_idx", 0)
+    if idx > 0:
+        await asyncio.sleep(idx * 1.2)
 
     activity_start = len(state.get("agent_activity", []))
 
@@ -248,13 +254,13 @@ def route_after_classify(state: CCIEState) -> str:
 def fan_out_competitors(state: CCIEState) -> list[Send]:
     session_id = state.get("session_id", "")
     sends = []
-    for competitor in state.get("competitors", []):
+    for idx, competitor in enumerate(state.get("competitors", [])):
         name = competitor.get("name", "")
         if name:
             sends.append(
                 Send(
                     "analyze_competitor",
-                    {"competitor_name": name, "session_id": session_id},
+                    {"competitor_name": name, "session_id": session_id, "competitor_idx": idx},
                 )
             )
     return sends
