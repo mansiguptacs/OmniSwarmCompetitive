@@ -145,6 +145,40 @@ class SimulationIteration(BaseModel):
     chosen_option: str = ""
 
 
+class ReactionDraft(BaseModel):
+    """LLM structured-output target for one CEO-agent's reaction."""
+
+    intent: str = ""
+    action: str = ""
+    rationale: str = ""
+    intensity: float = 0.5
+
+
+class CompanyDelta(BaseModel):
+    """Referee's new absolute values (0..1) for a company; None = unchanged."""
+
+    name: str
+    market_position: float | None = None
+    threat: float | None = None
+    sentiment: float | None = None
+    pressure: float | None = None
+
+
+class PlayerDelta(BaseModel):
+    position: float | None = None
+    momentum: float | None = None
+    risk: float | None = None
+
+
+class RefereeDraft(BaseModel):
+    """LLM structured-output target for the market referee adjudication."""
+
+    outcome_summary: str = ""
+    companies: list[CompanyDelta] = Field(default_factory=list)
+    player: PlayerDelta | None = None
+    options: list[DecisionOption] = Field(default_factory=list)
+
+
 class LedgerEntry(BaseModel):
     """An auditable record persisted to the agents' Redis repository.
 
