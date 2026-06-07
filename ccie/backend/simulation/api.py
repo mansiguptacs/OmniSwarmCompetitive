@@ -18,6 +18,7 @@ from simulation.session import (
     advance_simulation,
     end_simulation,
     fork_simulation,
+    get_evals,
     get_replay,
     get_simulation,
     start_simulation,
@@ -35,6 +36,7 @@ class StartRequest(BaseModel):
     initial_move: str | None = None
     max_iterations: int = 10
     max_incumbents: int = 6
+    seed: int | None = None
 
 
 class AdvanceRequest(BaseModel):
@@ -65,6 +67,7 @@ async def sim_start(req: StartRequest) -> SimulationState:
             initial_move=req.initial_move,
             max_iterations=req.max_iterations,
             max_incumbents=req.max_incumbents,
+            seed=req.seed,
         )
     except Exception as exc:
         logger.exception("sim start failed")
@@ -119,3 +122,11 @@ async def sim_replay(session_id: str) -> dict:
     if bundle is None:
         raise HTTPException(status_code=404, detail="session not found")
     return bundle
+
+
+@router.get("/evals/{session_id}")
+async def sim_evals(session_id: str) -> dict:
+    report = await get_evals(session_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return report

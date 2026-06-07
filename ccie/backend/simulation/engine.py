@@ -10,11 +10,14 @@ multi-turn loop.
 
 from __future__ import annotations
 
+import random
 from typing import Awaitable, Callable
 
 from llm.factory import get_llm
 from simulation.agents import gather_reactions, gather_reactions_two_pass
+from simulation.evals import score_iteration_quality
 from simulation.grounding import gather_grounding
+from simulation.guardrails import prune_ghost_alliances
 from simulation.ledger import build_iteration_entries
 from simulation.referee import adjudicate
 from simulation.scoring import recommend_option, score_board
@@ -79,6 +82,10 @@ async def run_iteration(
     index = state.current_index + 1
     board = current_board(state)
 
+    # Reproducibility: seed heuristic tie-breaks per turn (Phase 9).
+    if state.seed is not None:
+        random.seed(state.seed + index)
+
     grounding = None
     if ground:
         grounding = await gather_grounding(
@@ -101,6 +108,9 @@ async def run_iteration(
         grounding=grounding,
         llm_getter=llm_getter,
     )
+
+    # Guardrail: agents can only ally with real, in-roster companies.
+    reactions = prune_ghost_alliances(reactions, state.personas)
 
     outcome, new_board, decision = await adjudicate(
         move,
@@ -159,6 +169,8 @@ async def run_iteration(
         weave_trace_id=adj_id,
         weave_url=adj_url,
     )
+    # Per-iteration eval (Phase 9): grounding / persona-consistency / plausibility.
+    iteration.quality = score_iteration_quality(iteration, state.personas)
 
     state.iterations.append(iteration)
     state.current_index = index

@@ -21,6 +21,7 @@ from typing import Callable
 
 from llm.factory import get_llm
 from simulation.engine import run_iteration
+from simulation.evals import session_quality
 from simulation.ledger import (
     assemble_replay,
     build_choice_entry,
@@ -67,6 +68,7 @@ async def start_simulation(
     max_iterations: int = 10,
     max_incumbents: int = 6,
     session_id: str | None = None,
+    seed: int | None = None,
     store: SimulationStore | None = None,
     llm_getter: Callable[[], object] = get_llm,
 ) -> SimulationState:
@@ -91,6 +93,7 @@ async def start_simulation(
         personas=personas,
         max_iterations=max_iterations,
         status="running",
+        seed=seed,
     )
 
     move = initial_move or f"{player_company} acquires {target_name}"
@@ -180,6 +183,19 @@ async def get_replay(
         return None
     ledger = await store.get_ledger(session_id)
     return assemble_replay(state, ledger)
+
+
+async def get_evals(
+    session_id: str,
+    *,
+    store: SimulationStore | None = None,
+) -> dict | None:
+    """Return the quality/eval report for a session (Phase 9)."""
+    store = store or get_sim_store()
+    state = await store.get_state(session_id)
+    if state is None:
+        return None
+    return session_quality(state)
 
 
 async def fork_simulation(

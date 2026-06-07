@@ -1,8 +1,72 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ReplayBundle, ReplayReaction, ReplayTurn } from "@/types/simulation";
-import { getReplay } from "@/lib/simApi";
+import type { EvalsReport, ReplayBundle, ReplayReaction, ReplayTurn } from "@/types/simulation";
+import { getEvals, getReplay } from "@/lib/simApi";
+
+function QualityBar({ label, value, threshold }: { label: string; value: number; threshold?: number }) {
+  const pct = Math.round((value ?? 0) * 100);
+  const ok = threshold == null || value >= threshold;
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8" }}>
+        <span>{label}</span>
+        <span style={{ color: ok ? "#22c55e" : "#f59e0b" }}>{pct}%</span>
+      </div>
+      <div style={{ height: 5, background: "rgba(148,163,184,0.18)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: ok ? "#22c55e" : "#f59e0b" }} />
+      </div>
+    </div>
+  );
+}
+
+function QualityPanel({ report }: { report: EvalsReport }) {
+  const a = report.aggregate;
+  const t = report.thresholds || {};
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        padding: "12px 14px",
+        marginBottom: 18,
+        background: "rgba(2,6,23,0.4)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#e5e7eb" }}>Run quality (real-data evals)</div>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "2px 8px",
+            borderRadius: 999,
+            background: report.passed ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)",
+            color: report.passed ? "#22c55e" : "#f59e0b",
+          }}
+        >
+          {report.passed ? "✓ passes thresholds" : "⚠ below threshold"}
+        </span>
+      </div>
+      <QualityBar label="Grounding coverage" value={a.grounding_coverage} threshold={t.grounding_coverage} />
+      <QualityBar label="Persona consistency" value={a.persona_consistency} threshold={t.persona_consistency} />
+      <QualityBar label="Plausibility" value={a.plausibility} threshold={t.plausibility} />
+      <QualityBar label="Composite" value={a.composite} threshold={t.composite} />
+      {report.flag_count > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary style={{ fontSize: 11, color: "#f59e0b", cursor: "pointer" }}>
+            {report.flag_count} quality flag{report.flag_count === 1 ? "" : "s"}
+          </summary>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 11, color: "#94a3b8" }}>
+            {report.flags.map((f, i) => (
+              <li key={i}>{f}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function ScoreChip({ composite, delta }: { composite?: number; delta?: number }) {
   if (composite == null) return null;
@@ -148,6 +212,7 @@ function TurnBlock({ turn }: { turn: ReplayTurn }) {
 
 export function ReplayModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const [bundle, setBundle] = useState<ReplayBundle | null>(null);
+  const [evals, setEvals] = useState<EvalsReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -158,6 +223,12 @@ export function ReplayModal({ sessionId, onClose }: { sessionId: string; onClose
         if (!cancelled) setBundle(b);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load replay");
+      }
+      try {
+        const ev = await getEvals(sessionId);
+        if (!cancelled) setEvals(ev);
+      } catch {
+        // Evals are best-effort; the replay still renders without them.
       }
     })();
     return () => {
@@ -208,6 +279,8 @@ export function ReplayModal({ sessionId, onClose }: { sessionId: string; onClose
                 <span className="label-chip">⑂ branch from #{bundle.branched_from_index}</span>
               )}
             </div>
+
+            {evals && <QualityPanel report={evals} />}
 
             {bundle.final_recommendation && (
               <div

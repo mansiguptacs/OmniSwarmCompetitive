@@ -1,7 +1,8 @@
-"""Lightweight grounding / consistency guards for simulation agents.
+"""Grounding / consistency guards for simulation agents.
 
-Phase 3 keeps these intentionally minimal (attach evidence, fix actor, drop
-self-references, clamp). Full evaluation/scoring lands in Phase 9.
+Phase 3 added per-reaction normalization (attach evidence, fix actor, drop
+self-references, clamp). Phase 9 adds a board-level pass that prunes hallucinated
+alliances so the referee only ever sees real, in-roster relationships.
 """
 
 from __future__ import annotations
@@ -27,6 +28,11 @@ def ensure_grounded(reaction: AgentReaction, persona: CompanyPersona) -> AgentRe
     if not reaction.evidence and persona.sources:
         reaction.evidence = persona.sources[:2]
 
+    if not (reaction.rationale or "").strip():
+        reaction.rationale = (
+            f"{persona.name} responds in line with its {persona.temperament} posture."
+        )
+
     if reaction.ally_with:
         self_lower = persona.name.strip().lower()
         deduped: list[str] = []
@@ -40,3 +46,19 @@ def ensure_grounded(reaction: AgentReaction, persona: CompanyPersona) -> AgentRe
         reaction.ally_with = deduped
 
     return reaction
+
+
+def prune_ghost_alliances(
+    reactions: list[AgentReaction], personas: list[CompanyPersona]
+) -> list[AgentReaction]:
+    """Drop alliance targets that aren't real companies in the roster.
+
+    Keeps the referee/board honest: an agent can only ally with another incumbent
+    that actually exists in this game (no inventing partners).
+    """
+    valid = {p.name.strip().lower() for p in personas}
+    for r in reactions:
+        if not r.ally_with:
+            continue
+        r.ally_with = [a for a in r.ally_with if a.strip().lower() in valid]
+    return reactions

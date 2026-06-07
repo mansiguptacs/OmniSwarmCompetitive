@@ -153,6 +153,20 @@ class IterationScore(BaseModel):
     delta: float = 0.0
 
 
+class IterationQuality(BaseModel):
+    """Per-iteration eval scores (Phase 9) — does this turn hold up?
+
+    All scores are in [0,1] (higher = better). `flags` lists any quality issues
+    (e.g. ungrounded reactions, hallucinated allies) surfaced by the guardrails.
+    """
+
+    grounding_coverage: float = 0.0
+    persona_consistency: float = 0.0
+    plausibility: float = 1.0
+    composite: float = 0.0
+    flags: list[str] = Field(default_factory=list)
+
+
 class GroundingPacket(BaseModel):
     """Fresh, real-world signals fetched for one iteration (Phase 6).
 
@@ -180,6 +194,7 @@ class SimulationIteration(BaseModel):
     chosen_option: str = ""
     grounding: GroundingPacket | None = None
     score: IterationScore | None = None
+    quality: IterationQuality | None = None
     weave_trace_id: str = ""
     weave_url: str = ""
 
@@ -254,3 +269,5 @@ class SimulationState(BaseModel):
     # Branch lineage (Phase 7): set when this session was forked from another.
     parent_session_id: str = ""
     branched_from_index: int = 0
+    # Reproducibility (Phase 9): seeds heuristic tie-breaks for a deterministic run.
+    seed: int | None = None

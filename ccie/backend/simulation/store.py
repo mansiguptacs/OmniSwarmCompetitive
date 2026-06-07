@@ -12,8 +12,11 @@ Design notes:
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
+from typing import Awaitable, Callable, TypeVar
 
 from simulation.schemas import (
     CompanyPersona,
@@ -23,11 +26,37 @@ from simulation.schemas import (
 )
 
 _KEY_PREFIX = "ccie:sim"
+_WRITE_RETRIES = 3
+_RETRY_BACKOFF_S = 0.15
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "unknown"
+
+
+async def _retry_write(label: str, op: Callable[[], Awaitable[T]]) -> bool:
+    """Run a Redis write with bounded retries + backoff.
+
+    Redis Cloud free tier can transiently drop a write; retrying makes session
+    persistence reliable. On final failure we log (no longer silent) and return
+    False so a run never crashes on a storage hiccup.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, _WRITE_RETRIES + 1):
+        try:
+            await op()
+            return True
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt < _WRITE_RETRIES:
+                await asyncio.sleep(_RETRY_BACKOFF_S * attempt)
+    logger.warning("Redis write %r failed after %d attempts: %s", label, _WRITE_RETRIES, last_exc)
+    return False
 
 
 class SimulationStore:
@@ -51,15 +80,14 @@ class SimulationStore:
         return f"{_KEY_PREFIX}:persona:{slugify(company)}"
 
     async def save_persona(self, persona: CompanyPersona) -> bool:
-        try:
+        async def _op():
             client = await self._get_client()
             await client.set(
                 self._persona_key(persona.name),
                 json.dumps(persona.model_dump()),
             )
-            return True
-        except Exception:
-            return False
+
+        return await _retry_write(f"persona:{persona.name}", _op)
 
     async def get_persona(self, company: str) -> CompanyPersona | None:
         try:
@@ -77,15 +105,14 @@ class SimulationStore:
         return f"{_KEY_PREFIX}:state:{slugify(session_id)}"
 
     async def save_state(self, state: SimulationState) -> bool:
-        try:
+        async def _op():
             client = await self._get_client()
             await client.set(
                 self._state_key(state.session_id),
                 json.dumps(state.model_dump()),
             )
-            return True
-        except Exception:
-            return False
+
+        return await _retry_write(f"state:{state.session_id}", _op)
 
     async def get_state(self, session_id: str) -> SimulationState | None:
         try:
@@ -132,15 +159,15 @@ class SimulationStore:
     async def append_ledger(self, session_id: str, entries: list[LedgerEntry]) -> bool:
         if not entries:
             return True
-        try:
+
+        async def _op():
             client = await self._get_client()
             await client.rpush(
                 self._ledger_key(session_id),
                 *[json.dumps(e.model_dump()) for e in entries],
             )
-            return True
-        except Exception:
-            return False
+
+        return await _retry_write(f"ledger:{session_id}", _op)
 
     async def get_ledger(self, session_id: str) -> list[LedgerEntry]:
         try:

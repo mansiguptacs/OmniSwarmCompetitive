@@ -137,8 +137,33 @@ export interface SimulationIteration {
   chosen_option?: string;
   grounding?: GroundingPacket | null;
   score?: IterationScore | null;
+  quality?: IterationQuality | null;
   weave_trace_id?: string;
   weave_url?: string;
+}
+
+export interface IterationQuality {
+  grounding_coverage: number;
+  persona_consistency: number;
+  plausibility: number;
+  composite: number;
+  flags?: string[];
+}
+
+export interface EvalsReport {
+  session_id: string;
+  iterations: number;
+  aggregate: {
+    grounding_coverage: number;
+    persona_consistency: number;
+    plausibility: number;
+    composite: number;
+  };
+  thresholds: Record<string, number>;
+  passed: boolean;
+  per_turn: Array<{ index: number } & IterationQuality>;
+  flag_count: number;
+  flags: string[];
 }
 
 export interface ReplayReaction {

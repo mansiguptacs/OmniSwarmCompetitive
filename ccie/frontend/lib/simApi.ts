@@ -1,4 +1,4 @@
-import type { ReplayBundle, SimulationState } from "@/types/simulation";
+import type { EvalsReport, ReplayBundle, SimulationState } from "@/types/simulation";
 
 export interface StartParams {
   target: string;
@@ -59,4 +59,9 @@ export async function getSimulation(sessionId: string): Promise<SimulationState>
 export async function getReplay(sessionId: string): Promise<ReplayBundle> {
   const res = await fetch(`/api/sim/replay/${encodeURIComponent(sessionId)}`);
   return asJson<ReplayBundle>(res);
+}
+
+export async function getEvals(sessionId: string): Promise<EvalsReport> {
+  const res = await fetch(`/api/sim/evals/${encodeURIComponent(sessionId)}`);
+  return asJson<EvalsReport>(res);
 }
