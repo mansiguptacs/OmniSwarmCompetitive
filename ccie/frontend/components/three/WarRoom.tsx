@@ -41,12 +41,21 @@ function buildOccupiedSet(positions: [number, number][]): Set<string> {
 export function WarRoom({ target, hypothetical, competitors, selected, onSelect }: Props) {
   const hasTarget = target.trim().length > 0;
 
+  // Sort indices by threat (highest first) so top threats get inner spiral lots
+  const threatRanks = useMemo(() => {
+    const indexed = competitors.map((c, i) => ({ i, threat: c.threat_level ?? 0.5 }));
+    indexed.sort((a, b) => b.threat - a.threat);
+    const rank = new Array<number>(competitors.length);
+    indexed.forEach((entry, spiralSlot) => { rank[entry.i] = spiralSlot; });
+    return rank;
+  }, [competitors]);
+
   const positions = useMemo<[number, number][]>(
     () =>
       competitors.map((c, i) =>
-        competitorPosition(i, competitors.length, c.market_overlap),
+        competitorPosition(threatRanks[i], competitors.length, c.market_overlap),
       ),
-    [competitors],
+    [competitors, threatRanks],
   );
 
   const occupiedLots = useMemo(() => buildOccupiedSet(positions), [positions]);

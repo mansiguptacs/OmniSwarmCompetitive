@@ -78,7 +78,7 @@ function GoldenGateBridge() {
         </group>
       ))}
 
-      <Html position={[0, towerH + 2, 0]} center zIndexRange={[5, 0]}>
+      <Html position={[0, towerH + 2, 0]} center zIndexRange={[1, 0]}>
         <div style={{
           fontSize: 10, color: "#c0392b", fontWeight: 700, whiteSpace: "nowrap",
           textShadow: "0 1px 3px rgba(255,255,255,0.8)",
@@ -103,7 +103,7 @@ function TransamericaPyramid() {
         <coneGeometry args={[0.3, 5, 8]} />
         <meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.3} />
       </mesh>
-      <Html position={[0, 25, 0]} center zIndexRange={[5, 0]}>
+      <Html position={[0, 25, 0]} center zIndexRange={[1, 0]}>
         <div style={{
           fontSize: 9, color: "#8b7355", fontWeight: 600, whiteSpace: "nowrap",
           textShadow: "0 1px 2px rgba(255,255,255,0.9)",
@@ -133,7 +133,7 @@ function CoitTower() {
         <cylinderGeometry args={[1.8, 1.5, 1.2, 12]} />
         <meshStandardMaterial color="#e5dfd0" roughness={0.5} metalness={0.15} />
       </mesh>
-      <Html position={[0, 13, 0]} center zIndexRange={[5, 0]}>
+      <Html position={[0, 13, 0]} center zIndexRange={[1, 0]}>
         <div style={{
           fontSize: 9, color: "#6b7c5a", fontWeight: 600, whiteSpace: "nowrap",
           textShadow: "0 1px 2px rgba(255,255,255,0.9)",
@@ -170,7 +170,7 @@ function CableCar() {
         <boxGeometry args={[2.8, 0.2, 1.5]} />
         <meshStandardMaterial color="#8b2020" roughness={0.6} />
       </mesh>
-      <Html position={[3, 3.2, 0]} center zIndexRange={[5, 0]}>
+      <Html position={[3, 3.2, 0]} center zIndexRange={[1, 0]}>
         <div style={{
           fontSize: 8, color: "#cc4444", fontWeight: 600, whiteSpace: "nowrap",
           textShadow: "0 1px 2px rgba(255,255,255,0.9)",
@@ -200,7 +200,7 @@ function PierSign() {
         <boxGeometry args={[11, 0.6, 4.5]} />
         <meshStandardMaterial color="#a0785a" roughness={0.7} />
       </mesh>
-      <Html position={[0, 6, 0]} center zIndexRange={[5, 0]}>
+      <Html position={[0, 6, 0]} center zIndexRange={[1, 0]}>
         <div style={{
           fontSize: 9, color: "#8b6f47", fontWeight: 600, whiteSpace: "nowrap",
           textShadow: "0 1px 2px rgba(255,255,255,0.9)",
@@ -208,6 +208,110 @@ function PierSign() {
           Fisherman&apos;s Wharf
         </div>
       </Html>
+    </group>
+  );
+}
+
+/** Salesforce Tower — tallest building in SF skyline */
+function SalesforceTower() {
+  return (
+    <group position={[-30, 0, 20]}>
+      <mesh position={[0, 14, 0]} castShadow>
+        <cylinderGeometry args={[2.2, 2.5, 28, 16]} />
+        <meshStandardMaterial color="#b8c8d8" roughness={0.2} metalness={0.5} />
+      </mesh>
+      <mesh position={[0, 28.5, 0]}>
+        <sphereGeometry args={[2.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#c0d0e0" roughness={0.15} metalness={0.6} />
+      </mesh>
+      <Html position={[0, 30, 0]} center zIndexRange={[1, 0]}>
+        <div style={{ fontSize: 9, color: "#6888a8", fontWeight: 600, whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(255,255,255,0.9)" }}>
+          Salesforce Tower
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Painted Ladies — row of Victorian houses */
+function PaintedLadies() {
+  const colors = ["#e8a0a0", "#a0c8e8", "#b8e0a0", "#e8d0a0", "#c8a0d8"];
+  return (
+    <group position={[-45, 0, 15]}>
+      {colors.map((c, i) => (
+        <group key={i} position={[i * 2.8, 0, 0]}>
+          <mesh position={[0, 1.5, 0]} castShadow>
+            <boxGeometry args={[2.2, 3, 2]} />
+            <meshStandardMaterial color={c} roughness={0.7} />
+          </mesh>
+          {/* Peaked roof */}
+          <mesh position={[0, 3.5, 0]} castShadow>
+            <coneGeometry args={[1.6, 1.5, 4]} />
+            <meshStandardMaterial color="#5a4a3a" roughness={0.8} />
+          </mesh>
+          {/* Door */}
+          <mesh position={[0, 0.6, 1.01]}>
+            <planeGeometry args={[0.5, 1.2]} />
+            <meshStandardMaterial color="#3a2a1a" />
+          </mesh>
+          {/* Windows */}
+          <mesh position={[-0.5, 2, 1.01]}>
+            <planeGeometry args={[0.4, 0.5]} />
+            <meshStandardMaterial color="#a0d0f0" transparent opacity={0.8} />
+          </mesh>
+          <mesh position={[0.5, 2, 1.01]}>
+            <planeGeometry args={[0.4, 0.5]} />
+            <meshStandardMaterial color="#a0d0f0" transparent opacity={0.8} />
+          </mesh>
+        </group>
+      ))}
+      <Html position={[5.6, 5.5, 0]} center zIndexRange={[1, 0]}>
+        <div style={{ fontSize: 9, color: "#8a6a5a", fontWeight: 600, whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(255,255,255,0.9)" }}>
+          Painted Ladies
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Alcatraz — small island with building in the bay */
+function Alcatraz() {
+  return (
+    <group position={[45, -0.1, 65]}>
+      {/* Island */}
+      <mesh position={[0, 0.4, 0]}>
+        <cylinderGeometry args={[4, 5, 0.8, 12]} />
+        <meshStandardMaterial color="#8a9a70" roughness={0.95} />
+      </mesh>
+      {/* Main building */}
+      <mesh position={[0, 1.8, 0]} castShadow>
+        <boxGeometry args={[5, 2.4, 2.5]} />
+        <meshStandardMaterial color="#d8d0c0" roughness={0.8} />
+      </mesh>
+      {/* Lighthouse */}
+      <mesh position={[2, 3.5, 0]} castShadow>
+        <cylinderGeometry args={[0.3, 0.35, 2, 8]} />
+        <meshStandardMaterial color="#f0ece0" roughness={0.6} />
+      </mesh>
+      <Html position={[0, 4.5, 0]} center zIndexRange={[1, 0]}>
+        <div style={{ fontSize: 9, color: "#6a7a5a", fontWeight: 600, whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(255,255,255,0.9)" }}>
+          Alcatraz
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Trolley tracks running through the city */
+function TrolleyTracks() {
+  return (
+    <group>
+      {[-0.15, 0.15].map((offset, i) => (
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[offset, 0.025, 0]}>
+          <planeGeometry args={[0.08, 80]} />
+          <meshStandardMaterial color="#909090" metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -220,6 +324,10 @@ export function SFLandmarks() {
       <CoitTower />
       <CableCar />
       <PierSign />
+      <SalesforceTower />
+      <PaintedLadies />
+      <Alcatraz />
+      <TrolleyTracks />
     </group>
   );
 }

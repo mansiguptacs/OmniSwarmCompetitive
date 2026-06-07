@@ -241,7 +241,8 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
       <Html
         position={[0, topY + 1.5, 0]}
         center
-        zIndexRange={[10, 0]}
+        zIndexRange={[1, 0]}
+        style={{ pointerEvents: "auto" }}
       >
         <div style={{
           display: "flex",

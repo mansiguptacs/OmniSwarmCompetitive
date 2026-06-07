@@ -26,11 +26,13 @@ export const clamp = (v: number, min: number, max: number) =>
 export const clamp01 = (v: number) => clamp(v, 0, 1);
 
 export function threatToHeight(threat = 0.5): number {
-  return 2 + clamp01(threat) * 12;
+  const t = clamp01(threat);
+  return 1.5 + t * t * 16;
 }
 
 export function sizeToWidth(size = 0.5): number {
-  return 1.6 + clamp01(size) * 3;
+  const s = clamp01(size);
+  return 1.2 + s * 3.5;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
