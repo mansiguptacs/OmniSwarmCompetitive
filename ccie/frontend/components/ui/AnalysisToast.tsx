@@ -19,7 +19,7 @@ const PHASE_INFO: Partial<Record<Phase, { label: string; detail: string; color: 
 
 const AGENT_ORDER = ["News Scout", "Product Tracker", "Financial Analyst", "Synthesis"];
 
-const DISMISS_DELAY = 2500;
+const DISMISS_DELAY = 6000;
 
 function stripCompanyName(status: string, name: string): string {
   return status
@@ -72,6 +72,8 @@ export function AnalysisToast({
   useEffect(() => {
     if (competitors.length > 0 && prevTargetCount.current === 0) {
       setDismissed(new Set());
+      knownNamesRef.current = new Set();
+      completedNamesRef.current = new Set();
     }
     prevTargetCount.current = competitors.length;
   }, [competitors.length]);
@@ -83,8 +85,16 @@ export function AnalysisToast({
     return competitors.filter((c) => names.has(c.name));
   }, [analyzing, justCompleted, competitors]);
 
-  const totalDone = competitors.filter((c) => c.status === "complete").length;
-  const totalCount = competitors.length;
+  const knownNamesRef = useRef<Set<string>>(new Set());
+  const completedNamesRef = useRef<Set<string>>(new Set());
+
+  competitors.forEach((c) => {
+    if (c.name) knownNamesRef.current.add(c.name);
+    if (c.status === "complete") completedNamesRef.current.add(c.name);
+  });
+
+  const totalDone = completedNamesRef.current.size;
+  const totalCount = knownNamesRef.current.size;
   const msgs = activity ?? [];
 
   const phaseInfo = phase ? PHASE_INFO[phase] : undefined;
@@ -240,13 +250,13 @@ export function AnalysisToast({
             style={{
               position: "absolute",
               ...slot,
-              width: 280,
+              width: 340,
               background: done
-                ? "rgba(34,197,94,0.08)"
+                ? "rgba(10,18,32,0.95)"
                 : "rgba(15,23,42,0.94)",
               backdropFilter: "blur(12px)",
               border: done
-                ? "1px solid rgba(34,197,94,0.25)"
+                ? "1px solid rgba(34,197,94,0.4)"
                 : "1px solid rgba(148,163,184,0.1)",
               borderRadius: 10,
               padding: "12px 14px",
@@ -318,7 +328,7 @@ export function AnalysisToast({
                         animation: hasStarted && !isDone ? "pulse-glow 2s infinite" : undefined,
                       }} />
                       <div style={{
-                        fontSize: 8,
+                        fontSize: 9,
                         fontWeight: 600,
                         color: isDone ? meta.color : hasStarted ? "#94a3b8" : "#334155",
                         textTransform: "uppercase",
@@ -332,27 +342,29 @@ export function AnalysisToast({
               </div>
             )}
 
-            {/* Live agent log — last 3 messages for this company */}
+            {/* Live agent log — last 6 messages for this company */}
             {!done && companyMsgs.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {companyMsgs.slice(-3).map((m, mi) => {
-                  const isLatest = mi === Math.min(companyMsgs.length, 3) - 1;
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {companyMsgs.slice(-6).map((m, mi) => {
+                  const totalShown = Math.min(companyMsgs.length, 6);
+                  const isLatest = mi === totalShown - 1;
+                  const fadeLevel = mi / totalShown;
                   return (
                     <div key={`${m.ts}-${mi}`} style={{
-                      fontSize: 10,
-                      color: isLatest ? "#cbd5e1" : "#64748b",
-                      lineHeight: 1.4,
+                      fontSize: 12,
+                      color: isLatest ? "#e2e8f0" : "#94a3b8",
+                      lineHeight: 1.5,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
                       animation: isLatest ? "fadeInUp 0.2s ease" : undefined,
-                      opacity: isLatest ? 1 : 0.6,
+                      opacity: isLatest ? 1 : 0.35 + fadeLevel * 0.4,
                     }}>
                       <span style={{
                         color: AGENT_META[m.agent]?.color ?? "#64748b",
-                        fontWeight: 600,
-                        marginRight: 4,
-                        fontSize: 9,
+                        fontWeight: 700,
+                        marginRight: 5,
+                        fontSize: 11,
                       }}>
                         {AGENT_META[m.agent]?.label ?? m.agent}
                       </span>
