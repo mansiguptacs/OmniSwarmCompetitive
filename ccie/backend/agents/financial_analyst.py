@@ -52,10 +52,12 @@ async def run_financial_analyst(
     fin_summary = ""
     if has_data and financials:
         parts = []
-        if getattr(financials, "revenue", None):
-            parts.append(f"revenue {financials.revenue}")
-        if getattr(financials, "funding_total", None):
-            parts.append(f"funding {financials.funding_total}")
+        rev = financials.get("revenue") if isinstance(financials, dict) else getattr(financials, "revenue", None)
+        fund = financials.get("funding_total") if isinstance(financials, dict) else getattr(financials, "funding_total", None)
+        if rev:
+            parts.append(f"revenue {rev}")
+        if fund:
+            parts.append(f"funding {fund}")
         fin_summary = f" — found {', '.join(parts)}" if parts else " — limited data available"
     append_activity(
         state, "Financial Analyst",

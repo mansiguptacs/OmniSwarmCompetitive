@@ -1,5 +1,8 @@
 import logging
+import warnings
 from contextlib import asynccontextmanager
+
+warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
 
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import LangGraphAGUIAgent

@@ -122,7 +122,7 @@ async def _llm_extract_financials(company: str, results: list[NewsItem]) -> dict
             parsed = FinancialResult.model_validate(result)
         fin = {k: v for k, v in parsed.model_dump().items() if v}
         if results:
-            fin.setdefault("source", results[0].url)
+            fin["source"] = results[0].url
         return fin
     except Exception:
         logger.debug("LLM financial extraction failed for %s", company, exc_info=True)
@@ -136,12 +136,13 @@ async def search_financials(company: str) -> dict:
 
     if settings.use_mock_tools:
         return MOCK_FINANCIALS.get(company_key, {
-            "revenue": "Unknown",
-            "funding_total": "Unknown",
-            "valuation": "Unknown",
-            "market_cap": "Unknown",
-            "growth_rate": "Unknown",
-            "source": "",
+            "revenue": f"${(hash(company_key) % 50 + 1) * 100}M (est.)",
+            "funding_total": f"${(hash(company_key) % 20 + 1) * 50}M",
+            "valuation": f"${(hash(company_key) % 30 + 2)}B (est.)",
+            "market_cap": f"${(hash(company_key) % 100 + 5)}B",
+            "growth_rate": f"{(hash(company_key) % 35 + 5)}% YoY",
+            "employee_count": f"{(hash(company_key) % 50 + 1) * 1000}+",
+            "source": f"https://finance.example.com/{company_key}",
         })
 
     if not settings.TAVILY_API_KEY:
@@ -149,30 +150,35 @@ async def search_financials(company: str) -> dict:
         return {}
 
     try:
-        from langchain_community.tools.tavily_search import TavilySearchResults
+        import httpx
 
-        search = TavilySearchResults(
-            max_results=3,
-            api_key=settings.TAVILY_API_KEY,
-            include_answer=False,
-            include_raw_content=False,
-        )
-        results = await search.ainvoke({
-            "query": f"{company} revenue funding valuation market cap financials 2024 2025"
-        })
-        if not results:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": settings.TAVILY_API_KEY,
+                    "query": f"{company} revenue funding valuation market cap financials 2024 2025",
+                    "max_results": 3,
+                    "search_depth": "basic",
+                    "include_answer": False,
+                    "include_raw_content": False,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        raw_results = data.get("results", [])
+        if not raw_results:
             return {}
 
-        news_items = []
-        for r in results:
-            if isinstance(r, str):
-                news_items.append(NewsItem(title="", summary=r))
-            else:
-                news_items.append(NewsItem(
-                    title=r.get("title", ""),
-                    url=r.get("url", ""),
-                    summary=r.get("content", ""),
-                ))
+        news_items = [
+            NewsItem(
+                title=r.get("title", ""),
+                url=r.get("url", ""),
+                summary=r.get("content", ""),
+            )
+            for r in raw_results
+        ]
 
         llm_result = await _llm_extract_financials(company, news_items)
         if llm_result and len(llm_result) > 1:

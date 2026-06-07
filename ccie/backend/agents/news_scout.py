@@ -11,6 +11,7 @@ from state import (
     append_activity,
     find_competitor_index,
     get_competitors,
+    parse_competitor,
     set_competitors,
 )
 from tools.web_search import search_news
@@ -35,14 +36,18 @@ async def run_news_scout(
     competitors = get_competitors(state)
     index = find_competitor_index(state, target)
 
-    competitor = Competitor(name=target, news=news_items, status="analyzing")
-    if news_items:
-        competitor.sentiment = sum(item.sentiment for item in news_items) / len(news_items)
-
-    if index is None:
-        competitors.append(competitor)
-    else:
+    if index is not None:
+        competitor = parse_competitor(competitors[index])
+        competitor.news = news_items
+        competitor.status = "analyzing"
+        if news_items:
+            competitor.sentiment = sum(item.sentiment for item in news_items) / len(news_items)
         competitors[index] = competitor
+    else:
+        competitor = Competitor(name=target, news=news_items, status="analyzing")
+        if news_items:
+            competitor.sentiment = sum(item.sentiment for item in news_items) / len(news_items)
+        competitors.append(competitor)
 
     set_competitors(state, competitors)
 

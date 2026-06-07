@@ -17,7 +17,6 @@ function seededHash(name: string): number {
   return Math.abs(h);
 }
 
-/** Muted, professional building color — threat shifts hue subtly */
 function buildingColor(threat: number, hash: number): string {
   const t = clamp01(threat);
   const palettes = [
@@ -44,6 +43,12 @@ function windowColor(threat: number): string {
   return "#c8dcd0";
 }
 
+function targetScale(status?: string): number {
+  if (status === "complete") return 1;
+  if (status === "analyzing") return 0.35;
+  return 0.08;
+}
+
 interface Props {
   competitor: Competitor;
   position: [number, number];
@@ -54,18 +59,22 @@ interface Props {
 export function CompetitorBuilding({ competitor, position, selected, onSelect }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
-  const progress = useRef(0);
+  const currentScale = useRef(0.001);
   const [hovered, setHovered] = useState(false);
 
   const height = threatToHeight(competitor.threat_level);
   const width = sizeToWidth(competitor.market_size);
   const analyzing = competitor.status === "analyzing";
   const discovering = competitor.status === "discovering";
+  const complete = competitor.status === "complete";
 
   const hash = seededHash(competitor.name);
   const variant = hash % 5;
   const color = buildingColor(competitor.threat_level ?? 0.5, hash);
   const winColor = windowColor(competitor.threat_level ?? 0.5);
+
+  const goal = targetScale(competitor.status);
+  const lerpSpeed = complete ? 1.8 : analyzing ? 2.5 : 3.0;
 
   const windowRows = useMemo(() => {
     const rows: number[] = [];
@@ -75,16 +84,24 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
   }, [height]);
 
   useFrame((state, delta) => {
-    progress.current = Math.min(1, progress.current + delta * 1.3);
-    const p = easeOutCubic(progress.current);
+    const diff = goal - currentScale.current;
+    if (Math.abs(diff) > 0.001) {
+      currentScale.current += diff * Math.min(1, delta * lerpSpeed);
+    } else {
+      currentScale.current = goal;
+    }
+
+    const s = easeOutCubic(clamp01(currentScale.current));
+
     if (groupRef.current) {
-      groupRef.current.scale.set(1, Math.max(0.001, p), 1);
+      groupRef.current.scale.set(1, Math.max(0.001, s), 1);
     }
     if (matRef.current) {
       const base = selected ? 0.15 : hovered ? 0.08 : 0.03;
       const pulse = analyzing ? 0.08 + Math.sin(state.clock.elapsedTime * 4) * 0.06 : 0;
-      matRef.current.emissiveIntensity = base + pulse;
-      matRef.current.opacity = discovering ? 0.6 : 1;
+      const riseGlow = complete && s < 0.95 ? 0.15 * (1 - s) : 0;
+      matRef.current.emissiveIntensity = base + pulse + riseGlow;
+      matRef.current.opacity = discovering ? 0.45 : 1;
     }
   });
 
@@ -101,10 +118,7 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
       onPointerOut={() => { setHovered(false); document.body.style.cursor = "auto"; }}
     >
       <group ref={groupRef}>
-        {/* === Building shape variants === */}
-
         {variant === 0 && (
-          /* Classic box tower */
           <>
             <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
               <boxGeometry args={[width, height, width]} />
@@ -118,7 +132,6 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
         )}
 
         {variant === 1 && (
-          /* Stepped setback — wide base, narrower top */
           <>
             <mesh position={[0, height * 0.35, 0]} castShadow receiveShadow>
               <boxGeometry args={[width * 1.1, height * 0.7, width * 1.1]} />
@@ -126,7 +139,7 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
             </mesh>
             <mesh position={[0, height * 0.7 + height * 0.15, 0]} castShadow>
               <boxGeometry args={[width * 0.7, height * 0.3, width * 0.7]} />
-              <meshStandardMaterial color={color} metalness={0.2} roughness={0.45} transparent opacity={discovering ? 0.6 : 1} />
+              <meshStandardMaterial color={color} metalness={0.2} roughness={0.45} transparent opacity={discovering ? 0.45 : 1} />
             </mesh>
             <mesh position={[0, height * 0.85 + 0.08, 0]}>
               <boxGeometry args={[width * 0.7 + 0.1, 0.14, width * 0.7 + 0.1]} />
@@ -136,7 +149,6 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
         )}
 
         {variant === 2 && (
-          /* Cylindrical tower */
           <>
             <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
               <cylinderGeometry args={[width * 0.45, width * 0.48, height, 16]} />
@@ -150,7 +162,6 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
         )}
 
         {variant === 3 && (
-          /* Tapered / pyramidal top */
           <>
             <mesh position={[0, height * 0.4, 0]} castShadow receiveShadow>
               <boxGeometry args={[width, height * 0.8, width]} />
@@ -158,13 +169,12 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
             </mesh>
             <mesh position={[0, height * 0.8 + height * 0.12, 0]} castShadow>
               <coneGeometry args={[width * 0.55, height * 0.24, 4]} />
-              <meshStandardMaterial color={color} metalness={0.3} roughness={0.4} transparent opacity={discovering ? 0.6 : 1} />
+              <meshStandardMaterial color={color} metalness={0.3} roughness={0.4} transparent opacity={discovering ? 0.45 : 1} />
             </mesh>
           </>
         )}
 
         {variant === 4 && (
-          /* Twin-tower with bridge — wide base, two narrow tops */
           <>
             <mesh position={[0, height * 0.3, 0]} castShadow receiveShadow>
               <boxGeometry args={[width * 1.15, height * 0.6, width]} />
@@ -172,11 +182,11 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
             </mesh>
             <mesh position={[-width * 0.25, height * 0.6 + height * 0.2, 0]} castShadow>
               <boxGeometry args={[width * 0.45, height * 0.4, width * 0.6]} />
-              <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} transparent opacity={discovering ? 0.6 : 1} />
+              <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} transparent opacity={discovering ? 0.45 : 1} />
             </mesh>
             <mesh position={[width * 0.25, height * 0.6 + height * 0.15, 0]} castShadow>
               <boxGeometry args={[width * 0.45, height * 0.3, width * 0.6]} />
-              <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} transparent opacity={discovering ? 0.6 : 1} />
+              <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} transparent opacity={discovering ? 0.45 : 1} />
             </mesh>
             <mesh position={[0, height * 0.6 + 0.08, 0]}>
               <boxGeometry args={[width * 1.15 + 0.1, 0.14, width + 0.1]} />
@@ -185,7 +195,7 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
           </>
         )}
 
-        {/* Window bands on all four faces */}
+        {/* Window bands */}
         {windowRows.map((y, i) => {
           const maxY = variant === 1 ? height * 0.68 : variant === 3 ? height * 0.78 : variant === 4 ? height * 0.58 : height;
           if (y > maxY) return null;
@@ -194,22 +204,18 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
           const hw = width / 2 + 0.02;
           return (
             <group key={`win-${i}`}>
-              {/* front */}
               <mesh position={[0, y, hw]}>
                 <planeGeometry args={[bw, 0.25]} />
                 <meshStandardMaterial color={winColor} transparent opacity={op} />
               </mesh>
-              {/* back */}
               <mesh position={[0, y, -hw]} rotation={[0, Math.PI, 0]}>
                 <planeGeometry args={[bw, 0.25]} />
                 <meshStandardMaterial color={winColor} transparent opacity={op} />
               </mesh>
-              {/* left */}
               <mesh position={[-hw, y, 0]} rotation={[0, -Math.PI / 2, 0]}>
                 <planeGeometry args={[bw, 0.25]} />
                 <meshStandardMaterial color={winColor} transparent opacity={op} />
               </mesh>
-              {/* right */}
               <mesh position={[hw, y, 0]} rotation={[0, Math.PI / 2, 0]}>
                 <planeGeometry args={[bw, 0.25]} />
                 <meshStandardMaterial color={winColor} transparent opacity={op} />
@@ -227,17 +233,31 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
         </mesh>
       )}
 
+      {/* Construction sparkles while analyzing */}
       {analyzing && (
         <Sparkles
-          count={14}
-          scale={[width * 1.3, height * 1.2, width * 1.3]}
-          position={[0, height * 0.5, 0]}
-          size={2.5}
-          speed={0.5}
+          count={20}
+          scale={[width * 1.5, height * 0.5, width * 1.5]}
+          position={[0, height * 0.2, 0]}
+          size={3}
+          speed={0.8}
           color="#f1c40f"
         />
       )}
 
+      {/* Completion burst — visible briefly as building rises */}
+      {complete && currentScale.current < 0.9 && (
+        <Sparkles
+          count={30}
+          scale={[width * 2, height * 1.2, width * 2]}
+          position={[0, height * 0.5, 0]}
+          size={4}
+          speed={1.5}
+          color="#22c55e"
+        />
+      )}
+
+      {/* Label — only show when building is at least partially visible */}
       <Html
         position={[0, topY + 1.5, 0]}
         center
@@ -251,18 +271,24 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
           fontSize: 11,
           fontWeight: 700,
           color: "#2c3e50",
-          background: "rgba(255,255,255,0.92)",
+          background: complete
+            ? "rgba(255,255,255,0.95)"
+            : "rgba(255,255,255,0.7)",
           padding: "3px 10px",
           borderRadius: 4,
           whiteSpace: "nowrap",
-          boxShadow: "0 1px 6px rgba(0,0,0,0.15)",
-          borderLeft: `3px solid ${color}`,
+          boxShadow: complete
+            ? "0 2px 8px rgba(0,0,0,0.2)"
+            : "0 1px 4px rgba(0,0,0,0.1)",
+          borderLeft: `3px solid ${complete ? color : "#94a3b8"}`,
+          opacity: discovering ? 0.6 : 1,
+          transition: "all 0.3s",
         }}>
           <span style={{
             width: 18,
             height: 18,
             borderRadius: 4,
-            background: color,
+            background: complete ? color : "#94a3b8",
             color: "#fff",
             fontSize: 10,
             fontWeight: 800,
@@ -274,6 +300,16 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
             {competitor.name.charAt(0)}
           </span>
           {competitor.name}
+          {analyzing && (
+            <span style={{
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: "#f59e0b",
+              animation: "pulse-glow 1.5s infinite",
+              flexShrink: 0,
+            }} />
+          )}
         </div>
       </Html>
     </group>

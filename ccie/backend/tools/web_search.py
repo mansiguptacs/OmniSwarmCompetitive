@@ -152,6 +152,33 @@ def _mock_search(query: str, max_results: int) -> list[NewsItem]:
     for key, items in MOCK_COMPETITOR_NEWS.items():
         if key in query_lower:
             return items[:max_results]
+    # Generate company-specific mock news for any company
+    company = query_lower.replace("latest news", "").replace("news", "").strip()
+    if company:
+        name = company.title()
+        return [
+            NewsItem(
+                title=f"{name} announces strategic expansion plans",
+                url=f"https://techcrunch.com/2025/{name.lower().replace(' ', '-')}-expansion",
+                summary=f"{name} is investing in new markets and product lines as part of their growth strategy.",
+                sentiment=0.5,
+                published_at="2025-05-20",
+            ),
+            NewsItem(
+                title=f"{name} reports strong quarterly performance",
+                url=f"https://reuters.com/business/{name.lower().replace(' ', '-')}-earnings",
+                summary=f"{name} exceeded market expectations in their latest earnings report with revenue growth.",
+                sentiment=0.6,
+                published_at="2025-05-15",
+            ),
+            NewsItem(
+                title=f"{name} faces competitive pressure in core market",
+                url=f"https://bloomberg.com/news/{name.lower().replace(' ', '-')}-competition",
+                summary=f"Analysts note increasing competitive pressure on {name} from emerging players in the space.",
+                sentiment=-0.2,
+                published_at="2025-05-10",
+            ),
+        ][:max_results]
     return MOCK_STRIPE_NEWS[:max_results]
 
 
@@ -225,27 +252,35 @@ class WebSearchTool:
             return []
 
         try:
-            from langchain_community.tools.tavily_search import TavilySearchResults
-
-            tavily_kwargs: dict = {
-                "max_results": max_results,
-                "api_key": settings.TAVILY_API_KEY,
-                "include_answer": False,
-                "include_raw_content": False,
-            }
-            if "news" in query.lower() or "latest" in query.lower():
-                tavily_kwargs["search_depth"] = "advanced"
-
-            search = TavilySearchResults(**tavily_kwargs)
-            results = await search.ainvoke({"query": query})
-            if not results:
-                return []
-
-            news_items = [_tavily_result_to_news_item(result) for result in results]
-            return news_items[:max_results]
+            return await _tavily_search_raw(query, settings.TAVILY_API_KEY, max_results)
         except Exception as exc:
             logger.exception("Tavily search failed for query %r: %s", query, exc)
             return []
+
+
+async def _tavily_search_raw(query: str, api_key: str, max_results: int = 5) -> list[NewsItem]:
+    """Call Tavily REST API directly — avoids the deprecated LangChain wrapper."""
+    import httpx
+
+    search_depth = "advanced" if ("news" in query.lower() or "latest" in query.lower()) else "basic"
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": api_key,
+                "query": query,
+                "max_results": max_results,
+                "search_depth": search_depth,
+                "include_answer": False,
+                "include_raw_content": False,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    results = data.get("results", [])
+    return [_tavily_result_to_news_item(r) for r in results[:max_results]]
 
 
 _web_search_tool = WebSearchTool()
@@ -259,7 +294,14 @@ async def search_products(company: str, max_results: int = 5) -> list[ProductIte
     settings = get_settings()
     company_key = company.lower().strip()
     if settings.use_mock_tools:
-        return MOCK_PRODUCTS.get(company_key, MOCK_PRODUCTS["stripe"])[:max_results]
+        if company_key in MOCK_PRODUCTS:
+            return MOCK_PRODUCTS[company_key][:max_results]
+        name = company.strip().title()
+        return [
+            ProductItem(name=f"{name} Core Platform", description=f"Main product offering from {name}", pricing="Contact sales"),
+            ProductItem(name=f"{name} Enterprise", description=f"Enterprise-grade solution with advanced features", pricing="Custom pricing"),
+            ProductItem(name=f"{name} Analytics", description=f"Data and analytics tools for business intelligence", pricing="Included"),
+        ][:max_results]
 
     hits = await search_news(
         f"{company} products pricing plans features",

@@ -4,8 +4,18 @@ import { useState } from "react";
 import type { Competitor, NewsItem, ProductItem } from "@/types/ccie";
 import { sentimentColor, clamp01 } from "@/lib/visuals";
 
-const JUNK = new Set(["untitled", "unknown", "", "n/a", "see source", "private"]);
+const JUNK = new Set(["untitled", "", "n/a", "see source"]);
 const isReal = (v?: string) => !!v && !JUNK.has(v.trim().toLowerCase()) && v.trim().length > 2;
+const hasValue = (v?: string) => !!v && v.trim().length > 0 && v.trim().toLowerCase() !== "";
+
+function sourceDomain(url?: string): string {
+  if (!url) return "";
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return "";
+  }
+}
 
 function cleanNews(items?: NewsItem[], limit = 3): NewsItem[] {
   return (items ?? []).filter((n) => isReal(n.title)).slice(0, limit);
@@ -142,7 +152,7 @@ const S: Record<string, React.CSSProperties> = {
   },
 };
 
-/* ── Metric bar ────────────────────────────────────────────────── */
+/* ── Reusable visualizations ──────────────────────────────────── */
 
 function MetricBar({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.round(clamp01(value) * 100);
@@ -155,6 +165,103 @@ function MetricBar({ label, value, color }: { label: string; value: number; colo
       <div style={{ height: 4, borderRadius: 2, background: "rgba(148,163,184,0.1)" }}>
         <div style={{ height: "100%", borderRadius: 2, background: color, width: `${pct}%`, transition: "width 0.4s" }} />
       </div>
+    </div>
+  );
+}
+
+function SentimentBadge({ value }: { value?: number }) {
+  const s = value ?? 0;
+  const label = s > 0.2 ? "Bullish" : s < -0.2 ? "Bearish" : "Neutral";
+  const color = s > 0.2 ? "#22c55e" : s < -0.2 ? "#ef4444" : "#64748b";
+  const arrow = s > 0.2 ? "▲" : s < -0.2 ? "▼" : "●";
+  return (
+    <span style={{
+      fontSize: 10,
+      fontWeight: 700,
+      color,
+      background: `${color}18`,
+      padding: "2px 8px",
+      borderRadius: 4,
+      whiteSpace: "nowrap",
+    }}>
+      {arrow} {label}
+    </span>
+  );
+}
+
+function FinancialTicker({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
+  return (
+    <div style={{
+      padding: "10px 14px",
+      background: "rgba(148,163,184,0.04)",
+      borderRadius: 8,
+      border: "1px solid rgba(148,163,184,0.06)",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+    }}>
+      <div style={{
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        background: `${color}15`,
+        color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 15,
+        flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+        <div style={{ fontSize: 16, color: "#e2e8f0", fontWeight: 700, marginTop: 2 }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function SentimentMiniChart({ news }: { news: NewsItem[] }) {
+  if (news.length < 2) return null;
+  const values = news.map((n) => n.sentiment ?? 0);
+  const min = Math.min(...values, -0.5);
+  const max = Math.max(...values, 0.5);
+  const range = max - min || 1;
+  const w = 200;
+  const h = 40;
+
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const zeroY = h - ((0 - min) / range) * h;
+
+  return (
+    <div style={{ marginTop: 8, marginBottom: 4 }}>
+      <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>Sentiment Trend</div>
+      <svg width={w} height={h} style={{ display: "block" }}>
+        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#334155" strokeWidth="1" strokeDasharray="3,3" />
+        <polyline
+          fill="none"
+          stroke="#3b82f6"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+        {values.map((v, i) => {
+          const x = (i / (values.length - 1)) * w;
+          const y = h - ((v - min) / range) * h;
+          return (
+            <circle key={i} cx={x} cy={y} r="3" fill={v > 0.1 ? "#22c55e" : v < -0.1 ? "#ef4444" : "#64748b"} />
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -256,7 +363,7 @@ function DetailSlideOut({
               <div style={S.sectionTitle}>Competitive Metrics</div>
               <MetricBar label="Threat Level" value={competitor.threat_level ?? 0.5} color="#ef4444" />
               <MetricBar label="Market Overlap" value={competitor.market_overlap ?? 0.5} color="#f59e0b" />
-              <MetricBar label="Sentiment" value={(competitor.sentiment ?? 0) * 0.5 + 0.5} color="#22c55e" />
+              <MetricBar label="Market Sentiment" value={(competitor.sentiment ?? 0) * 0.5 + 0.5} color="#22c55e" />
               {competitor.market_size !== undefined && (
                 <MetricBar label="Market Size" value={competitor.market_size} color="#3b82f6" />
               )}
@@ -285,41 +392,95 @@ function DetailSlideOut({
         {/* ── Financials Tab ───────────────────────── */}
         {tab === "Financials" && (
           <>
+            {/* Ticker-style key metrics */}
             <div style={S.section}>
-              <div style={S.sectionTitle}>Financial Profile</div>
-              {(() => {
-                const fields: [string, string | undefined, string][] = [
-                  ["Revenue", fin.revenue, "#22c55e"],
-                  ["Total Funding", fin.funding_total, "#3b82f6"],
-                  ["Valuation", fin.valuation, "#a855f7"],
-                  ["Market Cap", fin.market_cap, "#f59e0b"],
-                  ["Growth Rate", fin.growth_rate, "#22d3ee"],
-                  ["Employees", fin.employee_count, "#94a3b8"],
-                ];
-                const validFields = fields.filter(([, v]) => isReal(v));
-
-                if (validFields.length === 0) {
-                  return (
-                    <div style={{ color: "#475569", fontSize: 13, padding: "20px 0" }}>
-                      No financial data available for this competitor.
-                    </div>
-                  );
-                }
-                return (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 20px" }}>
-                    {validFields.map(([label, value, color]) => (
-                      <div key={label} style={{ padding: "10px 14px", background: "rgba(148,163,184,0.04)", borderRadius: 8, border: "1px solid rgba(148,163,184,0.06)" }}>
-                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-                        <div style={{ fontSize: 18, color, fontWeight: 700, marginTop: 4 }}>{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+              <div style={S.sectionTitle}>Financial Overview</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <FinancialTicker label="Revenue" value={hasValue(fin.revenue) ? fin.revenue! : "Not disclosed"} icon="$" color="#22c55e" />
+                <FinancialTicker label="Funding" value={hasValue(fin.funding_total) ? fin.funding_total! : "Not disclosed"} icon="F" color="#3b82f6" />
+                <FinancialTicker label="Valuation" value={hasValue(fin.valuation) ? fin.valuation! : "Not disclosed"} icon="V" color="#a855f7" />
+                <FinancialTicker label="Market Cap" value={hasValue(fin.market_cap) ? fin.market_cap! : "Not disclosed"} icon="M" color="#f59e0b" />
+              </div>
             </div>
-            {isReal(fin.source) && (
-              <div style={S.section}>
-                <div style={{ fontSize: 10, color: "#475569" }}>Source: {fin.source}</div>
+
+            {/* Growth & scale */}
+            <div style={S.section}>
+              <div style={S.sectionTitle}>Growth & Scale</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <FinancialTicker label="Growth Rate" value={hasValue(fin.growth_rate) ? fin.growth_rate! : "Not disclosed"} icon="↗" color="#22d3ee" />
+                <FinancialTicker label="Employees" value={hasValue(fin.employee_count) ? fin.employee_count! : "Not disclosed"} icon="👤" color="#94a3b8" />
+              </div>
+            </div>
+
+            {/* Market position gauge */}
+            <div style={S.section}>
+              <div style={S.sectionTitle}>Market Position Gauge</div>
+              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                {/* Threat gauge */}
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <svg width="100" height="60" viewBox="0 0 100 60">
+                    <path d="M10 55 A40 40 0 0 1 90 55" fill="none" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                    <path
+                      d="M10 55 A40 40 0 0 1 90 55"
+                      fill="none"
+                      stroke={risk.color}
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${(competitor.threat_level ?? 0.5) * 126} 126`}
+                    />
+                    <text x="50" y="50" textAnchor="middle" fill="#e2e8f0" fontSize="14" fontWeight="800">
+                      {Math.round((competitor.threat_level ?? 0.5) * 100)}
+                    </text>
+                  </svg>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: -4 }}>Threat Score</div>
+                </div>
+                {/* Overlap gauge */}
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <svg width="100" height="60" viewBox="0 0 100 60">
+                    <path d="M10 55 A40 40 0 0 1 90 55" fill="none" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                    <path
+                      d="M10 55 A40 40 0 0 1 90 55"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${(competitor.market_overlap ?? 0.5) * 126} 126`}
+                    />
+                    <text x="50" y="50" textAnchor="middle" fill="#e2e8f0" fontSize="14" fontWeight="800">
+                      {Math.round((competitor.market_overlap ?? 0.5) * 100)}
+                    </text>
+                  </svg>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: -4 }}>Market Overlap</div>
+                </div>
+                {/* Sentiment gauge */}
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <svg width="100" height="60" viewBox="0 0 100 60">
+                    <path d="M10 55 A40 40 0 0 1 90 55" fill="none" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                    <path
+                      d="M10 55 A40 40 0 0 1 90 55"
+                      fill="none"
+                      stroke={sentimentColor(competitor.sentiment)}
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${((competitor.sentiment ?? 0) * 0.5 + 0.5) * 126} 126`}
+                    />
+                    <text x="50" y="50" textAnchor="middle" fill="#e2e8f0" fontSize="14" fontWeight="800">
+                      {(competitor.sentiment ?? 0) > 0 ? "+" : ""}{((competitor.sentiment ?? 0) * 100).toFixed(0)}
+                    </text>
+                  </svg>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: -4 }}>Sentiment</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Source */}
+            {hasValue(fin.source) && (
+              <div style={{ ...S.section, borderBottom: "none" }}>
+                <div style={{ fontSize: 10, color: "#475569" }}>
+                  Source: <a href={fin.source} target="_blank" rel="noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>
+                    {sourceDomain(fin.source) || fin.source}
+                  </a>
+                </div>
               </div>
             )}
           </>
@@ -332,22 +493,22 @@ function DetailSlideOut({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {(["strengths", "weaknesses", "opportunities", "threats"] as const).map((key) => {
                 const items = (swot[key] ?? []) as string[];
-                const config = {
-                  strengths: { label: "Strengths", color: "#22c55e", bg: "rgba(34,197,94,0.06)" },
-                  weaknesses: { label: "Weaknesses", color: "#ef4444", bg: "rgba(239,68,68,0.06)" },
-                  opportunities: { label: "Opportunities", color: "#3b82f6", bg: "rgba(59,130,246,0.06)" },
-                  threats: { label: "Threats", color: "#f59e0b", bg: "rgba(245,158,11,0.06)" },
+                const cfg = {
+                  strengths: { label: "Strengths", color: "#22c55e", bg: "rgba(34,197,94,0.06)", icon: "✦" },
+                  weaknesses: { label: "Weaknesses", color: "#ef4444", bg: "rgba(239,68,68,0.06)", icon: "⚠" },
+                  opportunities: { label: "Opportunities", color: "#3b82f6", bg: "rgba(59,130,246,0.06)", icon: "◎" },
+                  threats: { label: "Threats", color: "#f59e0b", bg: "rgba(245,158,11,0.06)", icon: "⚡" },
                 }[key];
                 return (
-                  <div key={key} style={{ background: config.bg, borderRadius: 8, padding: 12, border: `1px solid ${config.color}15` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: config.color, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {config.label}
+                  <div key={key} style={{ background: cfg.bg, borderRadius: 8, padding: 12, border: `1px solid ${cfg.color}15` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: cfg.color, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {cfg.icon} {cfg.label}
                     </div>
                     {items.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "#475569" }}>No data</div>
+                      <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>Insufficient data</div>
                     ) : (
                       items.map((item, i) => (
-                        <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginBottom: 6, paddingLeft: 8, borderLeft: `2px solid ${config.color}30` }}>
+                        <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginBottom: 6, paddingLeft: 8, borderLeft: `2px solid ${cfg.color}30` }}>
                           {item}
                         </div>
                       ))
@@ -362,21 +523,39 @@ function DetailSlideOut({
         {/* ── Products Tab ─────────────────────────── */}
         {tab === "Products" && (
           <div style={S.section}>
-            <div style={S.sectionTitle}>Product Portfolio</div>
+            <div style={S.sectionTitle}>Product Portfolio ({allProducts.length} identified)</div>
             {allProducts.length === 0 ? (
-              <div style={{ color: "#475569", fontSize: 13, padding: "20px 0" }}>
-                No product data available for this competitor.
+              <div style={{ color: "#475569", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📦</div>
+                No product data collected yet. Re-run analysis for deeper coverage.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {allProducts.map((p, i) => (
-                  <div key={i} style={{ padding: "12px 14px", background: "rgba(148,163,184,0.04)", borderRadius: 8, border: "1px solid rgba(148,163,184,0.06)" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>{p.name}</div>
+                  <div key={i} style={{
+                    padding: "12px 14px",
+                    background: "rgba(148,163,184,0.04)",
+                    borderRadius: 8,
+                    border: "1px solid rgba(148,163,184,0.06)",
+                    borderLeft: "3px solid #3b82f6",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", flex: 1 }}>{p.name}</div>
+                      {isReal(p.pricing) && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "#22c55e",
+                          background: "rgba(34,197,94,0.1)",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                        }}>
+                          {p.pricing}
+                        </span>
+                      )}
+                    </div>
                     {isReal(p.description) && (
-                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>{p.description}</div>
-                    )}
-                    {isReal(p.pricing) && (
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Pricing: {p.pricing}</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginTop: 4 }}>{p.description}</div>
                     )}
                   </div>
                 ))}
@@ -388,41 +567,59 @@ function DetailSlideOut({
         {/* ── News Tab ─────────────────────────────── */}
         {tab === "News" && (
           <div style={S.section}>
-            <div style={S.sectionTitle}>News & Market Signals</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={S.sectionTitle}>Market Signals ({allNews.length} articles)</div>
+              <SentimentBadge value={competitor.sentiment} />
+            </div>
+
+            <SentimentMiniChart news={allNews} />
+
             {allNews.length === 0 ? (
-              <div style={{ color: "#475569", fontSize: 13, padding: "20px 0" }}>
-                No news data available for this competitor.
+              <div style={{ color: "#475569", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📰</div>
+                No news signals collected yet. Re-run analysis for broader coverage.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {allNews.map((n, i) => (
-                  <div key={i} style={{
-                    padding: "12px 14px",
-                    background: "rgba(148,163,184,0.03)",
-                    borderRadius: 8,
-                    borderLeft: `3px solid ${sentimentColor(n.sentiment)}`,
-                  }}>
-                    <a
-                      href={n.url || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", textDecoration: "none", lineHeight: 1.4, display: "block" }}
-                    >
-                      {n.title}
-                    </a>
-                    {isReal(n.summary) && (
-                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginTop: 4 }}>
-                        {n.summary}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                {allNews.map((n, i) => {
+                  const domain = sourceDomain(n.url);
+                  return (
+                    <div key={i} style={{
+                      padding: "12px 14px",
+                      background: "rgba(148,163,184,0.03)",
+                      borderRadius: 8,
+                      borderLeft: `3px solid ${sentimentColor(n.sentiment)}`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "start", gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <a
+                            href={n.url || undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", textDecoration: "none", lineHeight: 1.4, display: "block" }}
+                          >
+                            {n.title}
+                            {n.url && <span style={{ fontSize: 10, color: "#3b82f6", marginLeft: 4 }}>↗</span>}
+                          </a>
+                          {isReal(n.summary) && (
+                            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginTop: 4 }}>
+                              {n.summary}
+                            </div>
+                          )}
+                        </div>
+                        <SentimentBadge value={n.sentiment} />
                       </div>
-                    )}
-                    <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 10, color: "#475569" }}>
-                      {n.published_at && <span>{n.published_at}</span>}
-                      <span style={{ color: sentimentColor(n.sentiment) }}>
-                        Sentiment: {(n.sentiment ?? 0) > 0.1 ? "Positive" : (n.sentiment ?? 0) < -0.1 ? "Negative" : "Neutral"}
-                      </span>
+                      <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 10, color: "#475569" }}>
+                        {n.published_at && <span>📅 {n.published_at}</span>}
+                        {domain && (
+                          <a href={n.url} target="_blank" rel="noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>
+                            🔗 {domain}
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -479,8 +676,8 @@ function SummaryCard({
   const concern = keyConcern(competitor);
 
   const finHighlights = (
-    [["Revenue", fin.revenue], ["Funding", fin.funding_total], ["Employees", fin.employee_count], ["Growth", fin.growth_rate]] as [string, string | undefined][]
-  ).filter(([, v]) => isReal(v));
+    [["Revenue", fin.revenue], ["Funding", fin.funding_total], ["Market Cap", fin.market_cap], ["Growth", fin.growth_rate]] as [string, string | undefined][]
+  ).filter(([, v]) => hasValue(v));
 
   return (
     <div style={S.panel}>
@@ -511,7 +708,6 @@ function SummaryCard({
             </button>
           </div>
         </div>
-
         <p style={{ margin: "12px 0 0", fontSize: 13, color: "#cbd5e1", lineHeight: 1.55 }}>
           {execBrief(competitor)}
         </p>
@@ -525,10 +721,30 @@ function SummaryCard({
         </div>
       </div>
 
+      {/* Quick Metrics */}
+      <div style={S.section}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1, textAlign: "center", padding: "8px 0", background: "rgba(239,68,68,0.06)", borderRadius: 6 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#ef4444" }}>{Math.round((competitor.threat_level ?? 0.5) * 100)}</div>
+            <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginTop: 1 }}>Threat</div>
+          </div>
+          <div style={{ flex: 1, textAlign: "center", padding: "8px 0", background: "rgba(245,158,11,0.06)", borderRadius: 6 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{Math.round((competitor.market_overlap ?? 0.5) * 100)}</div>
+            <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginTop: 1 }}>Overlap</div>
+          </div>
+          <div style={{ flex: 1, textAlign: "center", padding: "8px 0", background: `${sentimentColor(competitor.sentiment)}10`, borderRadius: 6 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: sentimentColor(competitor.sentiment) }}>
+              {(competitor.sentiment ?? 0) > 0 ? "+" : ""}{((competitor.sentiment ?? 0) * 100).toFixed(0)}
+            </div>
+            <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, marginTop: 1 }}>Sentiment</div>
+          </div>
+        </div>
+      </div>
+
       {/* Recommended Actions */}
       <div style={S.section}>
         <div style={S.sectionTitle}>Recommended Actions</div>
-        {recs.slice(0, 3).map((r, i) => (
+        {recs.slice(0, 2).map((r, i) => (
           <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "start" }}>
             <span style={{
               width: 20, height: 20, borderRadius: 6,
@@ -559,78 +775,29 @@ function SummaryCard({
         </div>
       )}
 
-      {/* Strengths vs Vulnerabilities */}
-      {(() => {
-        const swot = competitor.swot ?? {};
-        const str = ((swot.strengths ?? []) as string[]).slice(0, 2);
-        const wk = ((swot.weaknesses ?? []) as string[]).slice(0, 2);
-        if (str.length === 0 && wk.length === 0) return null;
-        return (
-          <div style={S.section}>
-            <div style={S.sectionTitle}>Competitive Analysis</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 14px" }}>
-              {str.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", marginBottom: 6 }}>THEIR EDGE</div>
-                  {str.map((s, i) => (
-                    <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginBottom: 4, paddingLeft: 8, borderLeft: "2px solid rgba(239,68,68,0.3)" }}>
-                      {s}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {wk.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", marginBottom: 6 }}>OUR OPPORTUNITY</div>
-                  {wk.map((w, i) => (
-                    <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, marginBottom: 4, paddingLeft: 8, borderLeft: "2px solid rgba(34,197,94,0.3)" }}>
-                      {w}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Products preview */}
-      {products.length > 0 && (
-        <div style={S.section}>
-          <div style={S.sectionTitle}>Products to Watch</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {products.map((p, i) => (
-              <span key={i} style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 6,
-                background: "rgba(148,163,184,0.08)", color: "#94a3b8",
-                border: "1px solid rgba(148,163,184,0.1)",
-              }}>
-                {p.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* News preview */}
+      {/* News snapshot */}
       {news.length > 0 && (
         <div style={S.section}>
-          <div style={S.sectionTitle}>Signal Watch</div>
-          {news.map((n, i) => (
-            <div key={i} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: `3px solid ${sentimentColor(n.sentiment)}` }}>
+          <div style={S.sectionTitle}>Latest Signals</div>
+          {news.slice(0, 2).map((n, i) => (
+            <div key={i} style={{ marginBottom: 8, display: "flex", gap: 6, alignItems: "start" }}>
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: 999,
+                background: sentimentColor(n.sentiment),
+                marginTop: 5,
+                flexShrink: 0,
+              }} />
               <a
                 href={n.url || undefined}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", textDecoration: "none", lineHeight: 1.4, display: "block" }}
+                style={{ fontSize: 12, color: "#cbd5e1", textDecoration: "none", lineHeight: 1.4 }}
               >
                 {n.title}
+                {n.url && <span style={{ color: "#3b82f6", marginLeft: 3, fontSize: 9 }}>↗</span>}
               </a>
-              {isReal(n.summary) && (
-                <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, marginTop: 2 }}>
-                  {n.summary!.length > 120 ? n.summary!.slice(0, 120) + "..." : n.summary}
-                </div>
-              )}
             </div>
           ))}
         </div>

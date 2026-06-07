@@ -9,6 +9,7 @@ import { deriveAgents } from "@/lib/visuals";
 import { PhaseBar } from "@/components/ui/PhaseBar";
 import { ActivityFeed } from "@/components/ui/ActivityFeed";
 import { DetailPanel } from "@/components/ui/DetailPanel";
+import { AnalysisToast } from "@/components/ui/AnalysisToast";
 
 const WarRoom = dynamic(
   () => import("@/components/three/WarRoom").then((m) => m.WarRoom),
@@ -92,6 +93,9 @@ export default function HomePage() {
           onAnalyze={handleAnalyze}
         />
       </div>
+
+      {/* Per-company analysis toasts */}
+      <AnalysisToast competitors={competitors} activity={effective.agent_activity} />
 
       {/* Bottom agent activity strip */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, pointerEvents: "none", zIndex: 20 }}>
