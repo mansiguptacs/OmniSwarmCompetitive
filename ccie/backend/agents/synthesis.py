@@ -5,7 +5,11 @@ from langchain_core.runnables import RunnableConfig
 
 from agents.helpers import safe_emit_state
 from agents.scoring import compute_competitor_metrics, compute_market_quadrants
-from llm.client import generate_landscape_summary, generate_swot_for_competitor
+from llm.client import (
+    generate_landscape_summary,
+    generate_swot_for_competitor,
+    score_competitors,
+)
 from memory.factory import get_memory_service
 from state import (
     CCIEState,
@@ -51,6 +55,18 @@ async def run_synthesis(
     if landscape:
         competitors = get_competitors(state)
         scored = [compute_competitor_metrics(c) for c in competitors]
+
+        # Count-based metrics saturate (every competitor gets ~5 news/products →
+        # all ~0.9). Override threat/size/overlap with model-driven scores so the
+        # buildings actually differ.
+        score_map = await score_competitors(state.get("target_company", ""), scored)
+        for competitor in scored:
+            cs = score_map.get(competitor.name)
+            if cs is not None:
+                competitor.threat_level = cs.threat_level
+                competitor.market_size = cs.market_size
+                competitor.market_overlap = cs.market_overlap
+
         set_competitors(state, scored)
         quadrants = compute_market_quadrants(scored)
         summary = await generate_landscape_summary(

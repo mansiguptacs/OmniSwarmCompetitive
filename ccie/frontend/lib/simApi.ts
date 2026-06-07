@@ -1,0 +1,67 @@
+import type { EvalsReport, ReplayBundle, SimulationState } from "@/types/simulation";
+
+export interface StartParams {
+  target: string;
+  player: string;
+  sector?: string;
+  max_iterations?: number;
+  max_incumbents?: number;
+}
+
+async function asJson<T>(res: Response): Promise<T> {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = (data as { detail?: string }).detail || `Request failed (${res.status})`;
+    throw new Error(detail);
+  }
+  return data as T;
+}
+
+export async function startSimulation(params: StartParams): Promise<SimulationState> {
+  const res = await fetch("/api/sim/start", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return asJson<SimulationState>(res);
+}
+
+export async function advanceSimulation(
+  sessionId: string,
+  choice: string,
+): Promise<SimulationState> {
+  const res = await fetch("/api/sim/advance", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, choice }),
+  });
+  return asJson<SimulationState>(res);
+}
+
+export async function forkSimulation(
+  sessionId: string,
+  fromIndex: number,
+  choice: string,
+): Promise<SimulationState> {
+  const res = await fetch("/api/sim/fork", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, from_index: fromIndex, choice }),
+  });
+  return asJson<SimulationState>(res);
+}
+
+export async function getSimulation(sessionId: string): Promise<SimulationState> {
+  const res = await fetch(`/api/sim/state/${encodeURIComponent(sessionId)}`);
+  return asJson<SimulationState>(res);
+}
+
+export async function getReplay(sessionId: string): Promise<ReplayBundle> {
+  const res = await fetch(`/api/sim/replay/${encodeURIComponent(sessionId)}`);
+  return asJson<ReplayBundle>(res);
+}
+
+export async function getEvals(sessionId: string): Promise<EvalsReport> {
+  const res = await fetch(`/api/sim/evals/${encodeURIComponent(sessionId)}`);
+  return asJson<EvalsReport>(res);
+}
