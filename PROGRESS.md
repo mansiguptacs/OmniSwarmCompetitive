@@ -409,3 +409,5 @@ CCIE_AUTO_SCORE=1
 | 2026-06-06 | Scoring v2 — financial signals (revenue/growth), relative quadrant placement |
 | 2026-06-06 | Hypothetical path hardening — LLM description refinement + multi-query search |
 | 2026-06-06 | 150 tests green (added `test_scoring.py` 12 tests + new financial tests) |
+| 2026-06-06 | `DATA_CONTRACT.md` — formal backend↔frontend data contract for 3D War Room |
+| 2026-06-06 | Frontend: typed `Financials` interface, financials section in `DetailPanel`, typed `MarketQuadrants` |

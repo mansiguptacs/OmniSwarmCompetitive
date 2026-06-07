@@ -155,7 +155,7 @@ def extract_competitors_from_search(
     search_results: list[NewsItem],
     target_company: str,
     *,
-    max_competitors: int = 5,
+    max_competitors: int = 20,
 ) -> list[str]:
     """Derive competitor names from Tavily/mock search hits."""
     exclude = {target_company.lower().strip()} if target_company else set()

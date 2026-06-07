@@ -24,7 +24,7 @@ REAL_COMPETITOR_MAP: dict[str, list[str]] = {
 HYPOTHETICAL_COMPETITORS = ["Kira Systems", "Luminance", "Harvey AI"]
 
 
-def _supplement_known_map(names: list[str], target_company: str, *, max_competitors: int = 5) -> list[str]:
+def _supplement_known_map(names: list[str], target_company: str, *, max_competitors: int = 20) -> list[str]:
     """Top up discovery with curated defaults when search extraction is sparse."""
     merged = list(names)
     defaults = REAL_COMPETITOR_MAP.get(target_company.lower().strip(), [])

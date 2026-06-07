@@ -40,6 +40,16 @@ export interface AgentNode {
   status: AgentStatus;
 }
 
+export interface Financials {
+  revenue?: string;
+  funding_total?: string;
+  valuation?: string;
+  market_cap?: string;
+  growth_rate?: string;
+  employee_count?: string;
+  source?: string;
+}
+
 export interface Competitor {
   name: string;
   description?: string;
@@ -50,10 +60,17 @@ export interface Competitor {
   status?: CompetitorStatus;
   news?: NewsItem[];
   products?: ProductItem[];
-  financials?: Record<string, unknown>;
+  financials?: Financials;
   swot?: Record<string, string[]>;
   /** Frontend-only: our analysis agents working this competitor (demo viz). */
   agents?: AgentNode[];
+}
+
+export interface MarketQuadrants {
+  leader: string[];
+  challenger: string[];
+  niche: string[];
+  visionary: string[];
 }
 
 export interface CCIEState {
@@ -62,7 +79,8 @@ export interface CCIEState {
   is_hypothetical?: boolean;
   competitors?: Competitor[];
   landscape_summary?: string;
-  market_quadrants?: Record<string, unknown>;
+  market_quadrants?: MarketQuadrants;
   agent_activity?: AgentActivity[];
   phase?: Phase;
+  session_id?: string;
 }

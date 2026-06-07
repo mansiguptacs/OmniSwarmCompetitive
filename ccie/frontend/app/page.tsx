@@ -110,7 +110,7 @@ export default function HomePage() {
         </div>
 
         {/* Right detail panel */}
-        <div style={{ position: "absolute", top: 92, right: 16, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: 92, right: 16, pointerEvents: "none", zIndex: 50 }}>
           <DetailPanel competitor={selectedCompetitor} onClose={() => setSelected(null)} />
         </div>
 

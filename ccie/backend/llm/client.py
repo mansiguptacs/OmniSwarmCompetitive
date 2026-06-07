@@ -16,7 +16,8 @@ def _build_hypothetical_queries(description: str, target_company: str) -> list[s
     if len(words) > 3:
         queries.append(f"startups {' '.join(words[:8])} market landscape")
     queries.append(f"companies similar to {desc[:80]}")
-    return queries[:3]
+    queries.append(f"top companies in {desc[:60]} industry market")
+    return queries[:4]
 
 
 def _format_search_context(items: list[NewsItem]) -> str:
@@ -57,10 +58,13 @@ async def discover_competitors_for_target(
     if is_hypothetical:
         search_queries = _build_hypothetical_queries(description, target_company)
     else:
-        search_queries = [f"{target_company} competitors"]
+        search_queries = [
+            f"{target_company} competitors",
+            f"{target_company} alternatives rivals market",
+        ]
 
     import asyncio
-    search_tasks = [search_news(q, max_results=5) for q in search_queries]
+    search_tasks = [search_news(q, max_results=10) for q in search_queries]
     all_results = await asyncio.gather(*search_tasks, return_exceptions=True)
     search_results: list[NewsItem] = []
     seen_titles: set[str] = set()
@@ -88,7 +92,8 @@ async def discover_competitors_for_target(
         prompt = (
             "You are a competitive intelligence analyst.\n"
             "A user is planning a startup or product. Based on their description, "
-            "identify the top 3-5 EXISTING companies that would be their most direct competitors.\n\n"
+            "identify up to 15-20 EXISTING companies that would be their competitors.\n"
+            "Include direct competitors, adjacent players, and emerging startups.\n\n"
             f"User's idea/description: {description}\n"
             f"Working name (if any): {target_company or 'N/A'}\n\n"
             "Think about:\n"
@@ -101,7 +106,8 @@ async def discover_competitors_for_target(
         )
     else:
         prompt = (
-            "Identify the top 3-5 direct competitors for competitive intelligence analysis.\n"
+            "Identify up to 15-20 competitors for competitive intelligence analysis.\n"
+            "Include direct competitors, adjacent players, and emerging challengers.\n"
             f"Target company: {target_company or 'N/A'}\n"
             f"Description: {description or 'N/A'}\n\n"
             f"Web search context:\n{_format_search_context(search_results)}\n\n"
