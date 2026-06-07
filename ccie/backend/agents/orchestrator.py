@@ -172,7 +172,7 @@ async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> d
 
     idx = state.get("competitor_idx", 0)
     if idx > 0:
-        await asyncio.sleep(idx * 3.1)
+        await asyncio.sleep(idx * 2.2)
 
     activity_start = len(state.get("agent_activity", []))
 

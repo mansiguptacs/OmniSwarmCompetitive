@@ -13,6 +13,7 @@ import { AnalysisToast } from "@/components/ui/AnalysisToast";
 import { SimOverlay } from "@/components/ui/SimOverlay";
 import { SimHUD } from "@/components/ui/SimHUD";
 import { SimPhaseBanner } from "@/components/ui/SimPhaseBanner";
+import { DashboardButton } from "@/components/ui/DashboardButton";
 import type { SimulationState, AgentReaction, SimulationIteration } from "@/types/simulation";
 
 const WarRoom = dynamic(
@@ -136,6 +137,9 @@ export default function HomePage() {
           onSimulate={() => setShowSim(true)}
         />
       </div>
+
+      {/* Floating CoreWeave dashboard button — always visible */}
+      <DashboardButton />
 
       {/* Per-company analysis toasts — hidden during sim */}
       {!simActive && (

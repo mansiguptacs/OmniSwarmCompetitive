@@ -1,0 +1,463 @@
+<mxfile host="app.diagrams.net" modified="2026-06-07" agent="StrategyOS" version="24.0" type="device">
+  <diagram id="arch-overview" name="Architecture Overview">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============================================================ -->
+        <!--  TITLE                                                        -->
+        <!-- ============================================================ -->
+        <mxCell id="title" value="StrategyOS — Multi-Agent Architecture" style="text;html=1;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;fontColor=#E4E4E4;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="700" y="20" width="600" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Two parallel agent systems sharing LLM, search, and storage infrastructure" style="text;html=1;fontSize=13;align=center;verticalAlign=middle;fontColor=#999999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="700" y="65" width="600" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  FRONTEND LAYER (top)                                         -->
+        <!-- ============================================================ -->
+        <mxCell id="frontend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a2e;strokeColor=#4a4a6a;arcSize=8;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="110" width="1840" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-label" value="Frontend — Next.js + React Three Fiber" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#E8A0C4;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="100" y="115" width="400" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="copilotkit" value="&lt;b&gt;CopilotKit Provider&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;useCoAgent / useCopilotChat&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2d44;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="150" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="warroom" value="&lt;b&gt;3D War Room&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;R3F City Grid + Competitor Buildings&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2d44;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="150" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simoverlay" value="&lt;b&gt;Sim Overlay / SimHUD&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Setup + Decision Cards + Phase Banner&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2d44;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="660" y="150" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simeffects" value="&lt;b&gt;SimEffects + Building Cards&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Reaction beams, pulses, decision overlays&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2d44;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="960" y="150" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simapi" value="&lt;b&gt;simApi.ts&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;REST + SSE client&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2d44;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="150" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="user-icon" value="&lt;b&gt;C-Suite User&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Human-in-the-Loop&lt;/font&gt;" style="shape=mxgraph.basic.person;html=1;fillColor=#F1B467;strokeColor=#C08532;fontColor=#1a1a1a;fontSize=11;fontStyle=1;arcSize=12;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="135" width="80" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Frontend connections -->
+        <mxCell id="fe1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666;fontSize=10;fontColor=#999;" edge="1" parent="1" source="copilotkit" target="warroom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fe2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666;fontSize=10;fontColor=#999;" edge="1" parent="1" source="simoverlay" target="simeffects">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  STREAMING / TRANSPORT LAYER                                  -->
+        <!-- ============================================================ -->
+        <mxCell id="transport-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2a1a;strokeColor=#3FA266;arcSize=8;dashed=1;dashPattern=8 4;opacity=60;" vertex="1" parent="1">
+          <mxGeometry x="80" y="260" width="1840" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="transport-label" value="Transport Layer" style="text;html=1;fontSize=12;fontStyle=1;align=left;verticalAlign=middle;fontColor=#3FA266;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="100" y="263" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agui-sse" value="&lt;b&gt;CopilotKit AG-UI SSE&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;/api/copilotkit → LangGraph endpoint&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2a1a;strokeColor=#3FA266;fontColor=#3FA266;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="280" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fastapi-sse" value="&lt;b&gt;FastAPI SSE Stream&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;:8000/api/sim/start/stream → direct SSE&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2a1a;strokeColor=#3FA266;fontColor=#3FA266;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="280" width="280" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Transport arrows from frontend -->
+        <mxCell id="t1" value="state sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;fontSize=9;fontColor=#3FA266;dashed=1;" edge="1" parent="1" source="copilotkit" target="agui-sse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="sim events" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;fontSize=9;fontColor=#3FA266;dashed=1;" edge="1" parent="1" source="simapi" target="fastapi-sse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  CCIE PIPELINE (left side)                                    -->
+        <!-- ============================================================ -->
+        <mxCell id="ccie-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0d1b2a;strokeColor=#2E79B5;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="360" width="860" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="ccie-title" value="CCIE Analysis Pipeline" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;fontColor=#70B0D8;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="100" y="370" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ccie-tag" value="LangGraph StateGraph + CopilotKit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2E79B5;strokeColor=none;fontColor=#FFFFFF;fontSize=10;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="370" y="372" width="220" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Classify -->
+        <mxCell id="classify" value="&lt;b&gt;Classifier Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Real company vs Hypothetical idea&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="330" y="420" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Enrich -->
+        <mxCell id="enrich" value="&lt;b&gt;Enrichment Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Company overview via web search&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="170" y="500" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="parse" value="&lt;b&gt;Hypothetical Parser&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM refines startup description&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="510" y="500" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Discover -->
+        <mxCell id="discover" value="&lt;b&gt;Discovery Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Find 15–20 competitors via search + LLM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="330" y="580" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Fan-out label -->
+        <mxCell id="fanout" value="⬡ Fan-Out via LangGraph Send API (N parallel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1B467;strokeColor=#C08532;fontColor=#1a1a1a;fontSize=11;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="200" y="660" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Sub-agents (parallel row) -->
+        <mxCell id="news" value="&lt;b&gt;News Scout&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Headlines + Sentiment&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="720" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="product" value="&lt;b&gt;Product Tracker&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Products + Pricing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="360" y="720" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="financial" value="&lt;b&gt;Financial Analyst&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Revenue + Funding + Market Cap&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="600" y="720" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- SWOT -->
+        <mxCell id="swot" value="&lt;b&gt;SWOT Synthesis&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Per-competitor scoring + analysis&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="330" y="810" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Fan-in label -->
+        <mxCell id="fanin" value="⬡ Fan-In — Merge all competitor analyses" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1B467;strokeColor=#C08532;fontColor=#1a1a1a;fontSize=11;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="200" y="890" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Landscape -->
+        <mxCell id="landscape" value="&lt;b&gt;Landscape Synthesis&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Quadrants (Leader/Challenger/Niche/Visionary)&lt;br&gt;Executive summary + market map&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="280" y="950" width="340" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Scoring -->
+        <mxCell id="scoring" value="&lt;b&gt;Scoring + Quadrants&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Threat / Size / Overlap metrics&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="950" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Observability -->
+        <mxCell id="obs" value="&lt;b&gt;Observability Hook&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Post-run quality scores&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2020;strokeColor=#D08770;fontColor=#E4E4E4;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1040" width="180" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- CCIE arrows -->
+        <mxCell id="c1" value="real" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;fontSize=9;fontColor=#70B0D8;" edge="1" parent="1" source="classify" target="enrich">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c1b" value="hypothetical" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;fontSize=9;fontColor=#70B0D8;" edge="1" parent="1" source="classify" target="parse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="enrich" target="discover">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c2b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="parse" target="discover">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="discover" target="fanout">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="fanout" target="news">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="fanout" target="product">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="fanout" target="financial">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c5a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="news" target="swot">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c5b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="product" target="swot">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c5c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="financial" target="swot">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="swot" target="fanin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="fanin" target="landscape">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E79B5;" edge="1" parent="1" source="landscape" target="scoring">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D08770;dashed=1;" edge="1" parent="1" source="landscape" target="obs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Transport to CCIE -->
+        <mxCell id="tc1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;dashed=1;" edge="1" parent="1" source="agui-sse" target="classify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  SIMULATION SYSTEM (right side)                               -->
+        <!-- ============================================================ -->
+        <mxCell id="sim-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a0d2a;strokeColor=#7B64B8;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="980" y="360" width="940" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="sim-title" value="M&amp;A War-Game Simulation" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;fontColor=#AA98D8;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="370" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sim-tag" value="Custom Async Engine (session.py / engine.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7B64B8;strokeColor=none;fontColor=#FFFFFF;fontSize=10;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="372" width="300" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Persona Builder -->
+        <mxCell id="persona" value="&lt;b&gt;Persona Builder&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;3 Tavily facets per company → CEO digital twin&lt;br&gt;with citations + temperament assignment&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="420" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Grounding -->
+        <mxCell id="grounding" value="&lt;b&gt;Grounding Layer&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Fresh market signals per turn (Tavily + Redis cache)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="510" width="280" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- CEO Pass 1 -->
+        <mxCell id="ceo1" value="&lt;b&gt;CEO Agents — Pass 1&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Concurrent independent reactions&lt;br&gt;In-character structured ReactionDraft&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#9386F2;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="600" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- CEO Pass 2 -->
+        <mxCell id="ceo2" value="&lt;b&gt;CEO Agents — Pass 2&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Revised after seeing rival moves&lt;br&gt;Alliances + escalation adjustments&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#9386F2;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="600" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Guardrails -->
+        <mxCell id="guardrails" value="&lt;b&gt;Guardrails&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Ghost-alliance pruning&lt;br&gt;Actor normalization&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2020;strokeColor=#D08770;fontColor=#E4E4E4;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="510" width="170" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Referee -->
+        <mxCell id="referee" value="&lt;b&gt;Market Referee&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Outcome narrative + BoardState deltas&lt;br&gt;DecisionPoint with 2–4 strategic options&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="700" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Strategy Scorer -->
+        <mxCell id="simscoring" value="&lt;b&gt;Strategy Scorer&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Composite score + recommended option&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="800" width="260" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Decision Point (HITL) -->
+        <mxCell id="decision" value="&lt;b&gt;DECISION POINT&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Human chooses next strategic move&lt;br&gt;Options: Integrate / Consolidate / Alliance / Custom&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#3a2a0a;strokeColor=#F1B467;fontColor=#F1B467;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="880" width="300" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Final Report -->
+        <mxCell id="final" value="&lt;b&gt;Final Report&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Executive strategy brief&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#201a30;strokeColor=#7B64B8;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="910" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Quality Evals -->
+        <mxCell id="evals" value="&lt;b&gt;Quality Evals&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Grounding coverage&lt;br&gt;Persona consistency&lt;br&gt;Plausibility scoring&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2020;strokeColor=#D08770;fontColor=#E4E4E4;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="790" width="170" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Temperaments label -->
+        <mxCell id="temps" value="&lt;font style=&quot;font-size:10px&quot;&gt;Temperaments: &lt;b&gt;Aggressive&lt;/b&gt; · &lt;b&gt;Acquisitive&lt;/b&gt; · &lt;b&gt;Litigious&lt;/b&gt; · &lt;b&gt;Partner-First&lt;/b&gt; · &lt;b&gt;Wait-and-See&lt;/b&gt;&lt;/font&gt;" style="text;html=1;fontSize=10;align=center;verticalAlign=middle;fontColor=#9386F2;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="665" width="500" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Sim arrows -->
+        <mxCell id="s1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B64B8;" edge="1" parent="1" source="persona" target="grounding">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;" edge="1" parent="1" source="grounding" target="ceo1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s2b" value="see rivals" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9386F2;fontSize=9;fontColor=#9386F2;" edge="1" parent="1" source="ceo1" target="ceo2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B64B8;" edge="1" parent="1" source="ceo2" target="referee">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3g" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D08770;dashed=1;" edge="1" parent="1" source="ceo2" target="guardrails">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B64B8;" edge="1" parent="1" source="referee" target="simscoring">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B64B8;" edge="1" parent="1" source="simscoring" target="decision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s5e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D08770;dashed=1;" edge="1" parent="1" source="simscoring" target="evals">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s6" value="complete" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#7B64B8;fontSize=9;fontColor=#AA98D8;" edge="1" parent="1" source="decision" target="final">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Back-edge: Decision → Grounding (next turn loop) -->
+        <mxCell id="s7" value="next turn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F1B467;fontSize=9;fontColor=#F1B467;dashed=1;dashPattern=8 4;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="decision" target="grounding">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="940" />
+              <mxPoint x="1010" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Transport to Sim -->
+        <mxCell id="ts1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;dashed=1;" edge="1" parent="1" source="fastapi-sse" target="persona">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  SHARED INFRASTRUCTURE (bottom)                               -->
+        <!-- ============================================================ -->
+        <mxCell id="infra-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#555;arcSize=6;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1170" width="1840" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-label" value="Shared Infrastructure" style="text;html=1;fontSize=14;fontStyle=1;align=left;verticalAlign=middle;fontColor=#E4E4E4;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1175" width="200" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="llm" value="&lt;b&gt;GPT-4o-mini&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Primary LLM for all agents&lt;br&gt;Structured outputs via Pydantic&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2a1a30;strokeColor=#9386F2;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1210" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tavily" value="&lt;b&gt;Tavily Search API&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;News, products, financials,&lt;br&gt;persona facets, grounding signals&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1210" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;CCIE memory index · Sim session state&lt;br&gt;Persona cache · Grounding TTL · Decision ledger&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#2a2020;strokeColor=#D08770;fontColor=#E4E4E4;fontSize=12;size=10;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1200" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="weave" value="&lt;b&gt;W&amp;B Weave&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Trace reasoning &amp;amp;&lt;br&gt;adjudication (best-effort)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d2020;strokeColor=#D08770;fontColor=#E4E4E4;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="1215" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="mock" value="&lt;b&gt;Mock Mode&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Heuristic fallbacks when&lt;br&gt;no API keys configured&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2a2a10;strokeColor=#C08532;fontColor=#E4E4E4;fontSize=11;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="1215" width="180" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Infra connections (dashed, from both systems) -->
+        <mxCell id="i1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9386F2;dashed=1;opacity=50;" edge="1" parent="1" source="landscape" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;dashed=1;opacity=50;" edge="1" parent="1" source="news" target="tavily">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9386F2;dashed=1;opacity=50;" edge="1" parent="1" source="referee" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3FA266;dashed=1;opacity=50;" edge="1" parent="1" source="grounding" target="tavily">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#D08770;dashed=1;opacity=50;" edge="1" parent="1" source="persona" target="redis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  BRIDGE: CCIE → Simulation                                    -->
+        <!-- ============================================================ -->
+        <mxCell id="bridge" value="&lt;b&gt;CCIE → Simulation Bridge&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Discovered competitors become&lt;br&gt;the CEO roster (incumbents_override)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2a2a10;strokeColor=#F1B467;fontColor=#F1B467;fontSize=12;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="1210" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F1B467;dashed=1;" edge="1" parent="1" source="scoring" target="bridge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F1B467;dashed=1;" edge="1" parent="1" source="bridge" target="persona">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1830" y="1240" />
+              <mxPoint x="1830" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!--  LEGEND                                                       -->
+        <!-- ============================================================ -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#111;strokeColor=#333;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1340" width="1000" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="Legend" style="text;html=1;fontSize=12;fontStyle=1;align=left;verticalAlign=middle;fontColor=#E4E4E4;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1345" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg1" value="" style="rounded=1;fillColor=#1a2840;strokeColor=#2E79B5;fontColor=#E4E4E4;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1375" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="CCIE Agent" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1372" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg2" value="" style="rounded=1;fillColor=#201a30;strokeColor=#7B64B8;fontColor=#E4E4E4;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1375" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="Simulation Agent" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="280" y="1372" width="130" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg3" value="" style="rounded=1;fillColor=#1a3020;strokeColor=#3FA266;fontColor=#E4E4E4;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1375" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="Tool / Service" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="450" y="1372" width="100" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg4" value="" style="rhombus;fillColor=#3a2a0a;strokeColor=#F1B467;fontColor=#F1B467;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1373" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="Human-in-the-Loop" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="586" y="1372" width="130" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg5" value="" style="rounded=1;fillColor=#2d2020;strokeColor=#D08770;fontColor=#E4E4E4;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1375" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5t" value="Guardrails / Evals" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="750" y="1372" width="120" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg6" value="" style="rounded=1;fillColor=#F1B467;strokeColor=#C08532;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1405" width="24" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6t" value="Fan-out / Fan-in" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1402" width="120" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg7" value="———" style="text;html=1;fontSize=11;align=left;fontColor=#F1B467;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1402" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg7t" value="Turn loop (back-edge)" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="290" y="1402" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg8" value="- - -" style="text;html=1;fontSize=11;align=left;fontColor=#3FA266;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1402" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg8t" value="SSE / streaming" style="text;html=1;fontSize=11;align=left;fontColor=#999;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="475" y="1402" width="120" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Stats row at the very bottom -->
+        <mxCell id="stat1" value="&lt;font style=&quot;font-size:24px;font-weight:bold&quot;&gt;12&lt;/font&gt;&lt;br&gt;Total Agents" style="text;html=1;fontSize=11;align=center;fontColor=#599CE7;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="1345" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="stat2" value="&lt;font style=&quot;font-size:24px;font-weight:bold&quot;&gt;2&lt;/font&gt;&lt;br&gt;Orchestrators" style="text;html=1;fontSize=11;align=center;fontColor=#599CE7;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="1345" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="stat3" value="&lt;font style=&quot;font-size:24px;font-weight:bold&quot;&gt;N&lt;/font&gt;&lt;br&gt;Parallel Fan-out" style="text;html=1;fontSize=11;align=center;fontColor=#599CE7;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="1345" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="stat4" value="&lt;font style=&quot;font-size:24px;font-weight:bold&quot;&gt;2&lt;/font&gt;&lt;br&gt;SSE Channels" style="text;html=1;fontSize=11;align=center;fontColor=#599CE7;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="1345" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="stat5" value="&lt;font style=&quot;font-size:24px;font-weight:bold&quot;&gt;5&lt;/font&gt;&lt;br&gt;CEO Temperaments" style="text;html=1;fontSize=11;align=center;fontColor=#599CE7;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1710" y="1345" width="130" height="50" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
