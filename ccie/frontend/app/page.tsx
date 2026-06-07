@@ -10,6 +10,7 @@ import { PhaseBar } from "@/components/ui/PhaseBar";
 import { ActivityFeed } from "@/components/ui/ActivityFeed";
 import { DetailPanel } from "@/components/ui/DetailPanel";
 import { AnalysisToast } from "@/components/ui/AnalysisToast";
+import { SimOverlay } from "@/components/ui/SimOverlay";
 
 const WarRoom = dynamic(
   () => import("@/components/three/WarRoom").then((m) => m.WarRoom),
@@ -38,6 +39,7 @@ export default function HomePage() {
   const { appendMessage } = useCopilotChat();
   const [selected, setSelected] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"summary" | "detail">("summary");
+  const [showSim, setShowSim] = useState(false);
 
   const effective: CCIEState = state ?? {};
   const competitors = effective.competitors ?? [];
@@ -91,6 +93,7 @@ export default function HomePage() {
           competitorCount={competitors.length}
           running={running}
           onAnalyze={handleAnalyze}
+          onSimulate={() => setShowSim(true)}
         />
       </div>
 
@@ -111,6 +114,15 @@ export default function HomePage() {
           onToggleMode={() => setDetailMode((m) => (m === "summary" ? "detail" : "summary"))}
         />
       </div>
+
+      {/* M&A War-Game Simulation overlay */}
+      {showSim && effective.target_company && (
+        <SimOverlay
+          targetCompany={effective.target_company}
+          competitors={competitors.map((c) => c.name)}
+          onClose={() => setShowSim(false)}
+        />
+      )}
 
       {/* Empty hint */}
       {!effective.target_company && !running && (

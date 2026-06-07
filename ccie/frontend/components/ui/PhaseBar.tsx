@@ -35,12 +35,14 @@ export function PhaseBar({
   competitorCount,
   running,
   onAnalyze,
+  onSimulate,
 }: {
   phase?: Phase;
   target?: string;
   competitorCount: number;
   running?: boolean;
   onAnalyze?: (company: string) => void;
+  onSimulate?: () => void;
 }) {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +137,31 @@ export function PhaseBar({
               <strong style={{ color: "#e5e7eb" }}>{target}</strong>
               {competitorCount > 0 && <> · {competitorCount} found</>}
             </span>
+
+            {phase === "complete" && onSimulate && (
+              <button
+                onClick={onSimulate}
+                style={{
+                  height: 32,
+                  padding: "0 14px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(245,158,11,0.4)",
+                  background: "rgba(245,158,11,0.12)",
+                  color: "#f59e0b",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>📊</span>
+                M&A Scenario Analysis
+              </button>
+            )}
           </div>
         )}
       </div>
