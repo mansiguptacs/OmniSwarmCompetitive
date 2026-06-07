@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 
-from simulation.schemas import CompanyPersona
+from simulation.schemas import CompanyPersona, SimulationState
 
 _KEY_PREFIX = "ccie:sim"
 
@@ -63,6 +63,32 @@ class SimulationStore:
             if not raw:
                 return None
             return CompanyPersona.model_validate(json.loads(raw))
+        except Exception:
+            return None
+
+    # --- Simulation state (full game session) ------------------------------
+
+    def _state_key(self, session_id: str) -> str:
+        return f"{_KEY_PREFIX}:state:{slugify(session_id)}"
+
+    async def save_state(self, state: SimulationState) -> bool:
+        try:
+            client = await self._get_client()
+            await client.set(
+                self._state_key(state.session_id),
+                json.dumps(state.model_dump()),
+            )
+            return True
+        except Exception:
+            return False
+
+    async def get_state(self, session_id: str) -> SimulationState | None:
+        try:
+            client = await self._get_client()
+            raw = await client.get(self._state_key(session_id))
+            if not raw:
+                return None
+            return SimulationState.model_validate(json.loads(raw))
         except Exception:
             return None
 

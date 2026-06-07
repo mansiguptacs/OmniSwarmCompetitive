@@ -66,6 +66,7 @@ export interface AgentReaction {
   action?: string;
   rationale?: string;
   intensity?: number;
+  ally_with?: string[];
   evidence?: Evidence[];
   weave_trace_id?: string;
   redis_key?: string;

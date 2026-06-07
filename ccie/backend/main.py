@@ -44,6 +44,11 @@ app.add_middleware(
 )
 add_langgraph_fastapi_endpoint(app, agent, "/api/copilotkit/")
 
+# Acquisition war-game simulator (additive; baseline agent unaffected).
+from simulation.api import router as simulation_router  # noqa: E402
+
+app.include_router(simulation_router)
+
 
 @app.get("/health")
 async def health():

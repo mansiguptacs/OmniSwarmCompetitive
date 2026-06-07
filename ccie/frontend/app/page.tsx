@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useCoAgent } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import type { CCIEState, Competitor } from "@/types/ccie";
@@ -73,6 +74,22 @@ export default function HomePage() {
           <p style={{ margin: "6px 0 0", color: "#9ca3af", fontSize: 13 }}>
             Try <code>Analyze Stripe</code> or describe a startup idea.
           </p>
+          <Link
+            href="/simulate"
+            style={{
+              display: "inline-block",
+              marginTop: 10,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "#3b82f6",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Open Acquisition War-Game →
+          </Link>
         </header>
         <div style={{ flex: 1, minHeight: 0 }}>
           <CopilotChat
