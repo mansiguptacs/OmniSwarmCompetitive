@@ -199,10 +199,23 @@ async def analyze_competitor_node(state: CCIEState, config: RunnableConfig) -> d
 @trace_node(name="landscape_synthesis")
 async def landscape_synthesis_node(state: CCIEState, config: RunnableConfig) -> dict:
     state["phase"] = "synthesizing"
+    append_activity(
+        state, "Synthesis",
+        "Starting landscape synthesis — building competitive map and executive summary...",
+        time.time(),
+    )
+    await safe_emit_state(config, {"phase": "synthesizing", "agent_activity": state.get("agent_activity", [])})
+
     result = await run_synthesis(state, config, landscape=True)
     summary = result.get("landscape_summary", "Analysis complete.")
+    append_activity(
+        state, "Synthesis",
+        "Landscape synthesis complete — finalizing competitive intelligence report...",
+        time.time(),
+    )
     updates = {
         **result,
+        "phase": "complete",
         "messages": [AIMessage(content=summary)],
     }
 

@@ -15,11 +15,13 @@ transport-agnostic core so it stays fully testable.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from typing import Callable
+from typing import AsyncIterator, Callable
 
 from llm.factory import get_llm
+from simulation.agents import ProgressCallback
 from simulation.engine import run_iteration
 from simulation.evals import session_quality
 from simulation.ledger import (
@@ -236,3 +238,145 @@ async def fork_simulation(
         branch.final_recommendation = await final_report(branch, llm_getter=llm_getter)
     await store.save_state(branch)
     return branch
+
+
+# ── Streaming helpers (SSE) ──────────────────────────────────────
+
+def _make_progress_emitter(queue: asyncio.Queue) -> ProgressCallback:
+    """Return a sync callback that pushes events into an asyncio queue."""
+    def _emit(kind: str, name: str | None, data: object) -> None:
+        queue.put_nowait({"kind": kind, "name": name, "data": data})
+    return _emit
+
+
+async def start_simulation_stream(
+    target_name: str,
+    player_company: str,
+    *,
+    sector_id: str = DEFAULT_SECTOR,
+    initial_move: str | None = None,
+    max_iterations: int = 10,
+    max_incumbents: int = 6,
+    session_id: str | None = None,
+    seed: int | None = None,
+    store: SimulationStore | None = None,
+    llm_getter: Callable[[], object] = get_llm,
+) -> AsyncIterator[dict]:
+    """Same as *start_simulation* but yields progress events via SSE."""
+    store = store or get_sim_store()
+    session_id = session_id or uuid.uuid4().hex
+
+    sector = get_sector(
+        sector_id,
+        exclude=[player_company, target_name],
+        max_incumbents=max_incumbents,
+    )
+    personas = await build_personas(
+        sector.incumbents, llm_getter=llm_getter, store=store
+    )
+
+    state = SimulationState(
+        session_id=session_id,
+        sector=sector,
+        target=AcquisitionTarget(name=target_name),
+        player=PlayerProfile(company=player_company),
+        personas=personas,
+        max_iterations=max_iterations,
+        status="running",
+        seed=seed,
+    )
+
+    yield {"kind": "personas", "name": None, "data": [p.model_dump() for p in personas]}
+
+    move = initial_move or f"{player_company} acquires {target_name}"
+    await store.append_ledger(session_id, build_persona_entries(state))
+    await store.append_ledger(
+        session_id, [build_choice_entry(session_id, 1, player_company, move)]
+    )
+
+    queue: asyncio.Queue = asyncio.Queue()
+    emitter = _make_progress_emitter(queue)
+
+    async def _run_bg():
+        await run_iteration(state, move, store=store, llm_getter=llm_getter, on_progress=emitter)
+        queue.put_nowait(None)  # sentinel
+
+    task = asyncio.create_task(_run_bg())
+
+    while True:
+        event = await queue.get()
+        if event is None:
+            break
+        serialisable = dict(event)
+        data = serialisable.get("data")
+        if data is not None and hasattr(data, "model_dump"):
+            serialisable["data"] = data.model_dump()
+        elif data is not None and not isinstance(data, (dict, list, str, int, float, bool, type(None))):
+            serialisable["data"] = str(data)
+        yield serialisable
+
+    await task
+
+    if state.status == "complete" and not state.final_recommendation:
+        state.final_recommendation = await final_report(state, llm_getter=llm_getter)
+        await store.append_ledger(session_id, [build_recommendation_entry(state)])
+    await store.save_state(state)
+
+    yield {"kind": "complete", "name": None, "data": state.model_dump()}
+
+
+async def advance_simulation_stream(
+    session_id: str,
+    choice: str,
+    *,
+    store: SimulationStore | None = None,
+    llm_getter: Callable[[], object] = get_llm,
+) -> AsyncIterator[dict]:
+    """Same as *advance_simulation* but yields progress events via SSE."""
+    store = store or get_sim_store()
+    state = await store.get_state(session_id)
+    if state is None:
+        raise ValueError(f"No simulation found for session {session_id!r}")
+
+    if state.status == "complete" or state.current_index >= state.max_iterations:
+        state.status = "complete"
+        await store.save_state(state)
+        yield {"kind": "complete", "name": None, "data": state.model_dump()}
+        return
+
+    move = _resolve_move(state, choice)
+    player_name = state.player.company if state.player else "player"
+    await store.append_ledger(
+        session_id,
+        [build_choice_entry(session_id, state.current_index + 1, player_name, move)],
+    )
+
+    queue: asyncio.Queue = asyncio.Queue()
+    emitter = _make_progress_emitter(queue)
+
+    async def _run_bg():
+        await run_iteration(state, move, store=store, llm_getter=llm_getter, on_progress=emitter)
+        queue.put_nowait(None)
+
+    task = asyncio.create_task(_run_bg())
+
+    while True:
+        event = await queue.get()
+        if event is None:
+            break
+        serialisable = dict(event)
+        data = serialisable.get("data")
+        if data is not None and hasattr(data, "model_dump"):
+            serialisable["data"] = data.model_dump()
+        elif data is not None and not isinstance(data, (dict, list, str, int, float, bool, type(None))):
+            serialisable["data"] = str(data)
+        yield serialisable
+
+    await task
+
+    if state.status == "complete" and not state.final_recommendation:
+        state.final_recommendation = await final_report(state, llm_getter=llm_getter)
+        await store.append_ledger(session_id, [build_recommendation_entry(state)])
+    await store.save_state(state)
+
+    yield {"kind": "complete", "name": None, "data": state.model_dump()}

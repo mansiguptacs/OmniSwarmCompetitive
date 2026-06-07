@@ -14,7 +14,7 @@ import random
 from typing import Awaitable, Callable
 
 from llm.factory import get_llm
-from simulation.agents import gather_reactions, gather_reactions_two_pass
+from simulation.agents import ProgressCallback, gather_reactions, gather_reactions_two_pass
 from simulation.evals import score_iteration_quality
 from simulation.grounding import gather_grounding
 from simulation.guardrails import prune_ghost_alliances
@@ -64,6 +64,7 @@ async def run_iteration(
     store: SimulationStore | None = None,
     ground: bool = True,
     llm_getter: Callable[[], object] = get_llm,
+    on_progress: ProgressCallback | None = None,
 ) -> SimulationIteration:
     """Run one iteration against the current state and record it.
 
@@ -86,6 +87,9 @@ async def run_iteration(
     if state.seed is not None:
         random.seed(state.seed + index)
 
+    if on_progress is not None:
+        on_progress("stage", "grounding", None)
+
     grounding = None
     if ground:
         grounding = await gather_grounding(
@@ -98,6 +102,9 @@ async def run_iteration(
             store=store,
         )
 
+    if on_progress is not None:
+        on_progress("grounding_done", None, grounding)
+
     reactor = gather_reactions_two_pass if interactive else gather_reactions
     reactions = await reactor(
         state.personas,
@@ -107,10 +114,14 @@ async def run_iteration(
         player=state.player,
         grounding=grounding,
         llm_getter=llm_getter,
+        on_progress=on_progress,
     )
 
     # Guardrail: agents can only ally with real, in-roster companies.
     reactions = prune_ghost_alliances(reactions, state.personas)
+
+    if on_progress is not None:
+        on_progress("stage", "referee", None)
 
     outcome, new_board, decision = await adjudicate(
         move,
@@ -122,6 +133,9 @@ async def run_iteration(
         grounding=grounding,
         llm_getter=llm_getter,
     )
+
+    if on_progress is not None:
+        on_progress("stage", "scoring", None)
 
     # Score the new board (delta vs. the previous iteration's score).
     prev_score = state.iterations[-1].score if state.iterations else None

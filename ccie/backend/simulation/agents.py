@@ -158,6 +158,9 @@ async def react_as_ceo(
         return ensure_grounded(_heuristic_reaction(persona, move, target, grounding), persona)
 
 
+ProgressCallback = Callable[..., None]
+
+
 async def gather_reactions(
     personas: list[CompanyPersona],
     move: str,
@@ -167,24 +170,30 @@ async def gather_reactions(
     player: PlayerProfile | None = None,
     grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
+    on_progress: ProgressCallback | None = None,
 ) -> list[AgentReaction]:
-    """All CEO-agents react concurrently (first pass — independent)."""
-    return list(
-        await asyncio.gather(
-            *(
-                react_as_ceo(
-                    persona,
-                    move,
-                    board,
-                    target=target,
-                    player=player,
-                    grounding=grounding,
-                    llm_getter=llm_getter,
-                )
-                for persona in personas
-            )
+    """All CEO-agents react concurrently (first pass — independent).
+
+    When *on_progress* is provided, it is called with
+    ``("analyzing", name, None)`` when an agent starts, and
+    ``("reaction", name, reaction)`` when it completes.
+    """
+    results: list[AgentReaction] = [None] * len(personas)  # type: ignore[list-item]
+
+    async def _run(idx: int, persona: CompanyPersona) -> None:
+        if on_progress is not None:
+            on_progress("analyzing", persona.name, None)
+        reaction = await react_as_ceo(
+            persona, move, board,
+            target=target, player=player,
+            grounding=grounding, llm_getter=llm_getter,
         )
-    )
+        results[idx] = reaction
+        if on_progress is not None:
+            on_progress("reaction", persona.name, reaction)
+
+    await asyncio.gather(*(_run(i, p) for i, p in enumerate(personas)))
+    return results
 
 
 def _others_text(others: list[AgentReaction]) -> str:
@@ -290,30 +299,35 @@ async def gather_reactions_two_pass(
     player: PlayerProfile | None = None,
     grounding: GroundingPacket | None = None,
     llm_getter: Callable[[], object] = get_llm,
+    on_progress: ProgressCallback | None = None,
 ) -> list[AgentReaction]:
     """Two-pass interaction: agents react, then revise after seeing each other."""
+    if on_progress is not None:
+        on_progress("stage", "first_pass", None)
+
     first_pass = await gather_reactions(
-        personas,
-        move,
-        board,
-        target=target,
-        player=player,
-        grounding=grounding,
-        llm_getter=llm_getter,
+        personas, move, board,
+        target=target, player=player,
+        grounding=grounding, llm_getter=llm_getter,
+        on_progress=on_progress,
     )
-    second_pass = await asyncio.gather(
-        *(
-            revise_reaction(
-                persona,
-                move,
-                board,
-                first_pass,
-                target=target,
-                player=player,
-                grounding=grounding,
-                llm_getter=llm_getter,
-            )
-            for persona in personas
+
+    if on_progress is not None:
+        on_progress("stage", "second_pass", None)
+
+    results: list[AgentReaction] = [None] * len(personas)  # type: ignore[list-item]
+
+    async def _revise(idx: int, persona: CompanyPersona) -> None:
+        if on_progress is not None:
+            on_progress("revising", persona.name, None)
+        reaction = await revise_reaction(
+            persona, move, board, first_pass,
+            target=target, player=player,
+            grounding=grounding, llm_getter=llm_getter,
         )
-    )
-    return list(second_pass)
+        results[idx] = reaction
+        if on_progress is not None:
+            on_progress("revised", persona.name, reaction)
+
+    await asyncio.gather(*(_revise(i, p) for i, p in enumerate(personas)))
+    return results

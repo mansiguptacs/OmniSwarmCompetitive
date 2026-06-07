@@ -160,20 +160,26 @@ function StreetGrid({ gridRadius }: { gridRadius: number }) {
 /* ── SF Bay water ────────────────────────────────────────────── */
 
 function BayWater({ extent }: { extent: number }) {
+  const waterWidth = extent * 3.5;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, extent + 15]} receiveShadow>
-        <planeGeometry args={[extent * 3, 40]} />
-        <meshStandardMaterial
-          color="#2e86c1"
-          roughness={0.3}
-          metalness={0.15}
-          transparent
-          opacity={0.85}
-        />
+      {/* Main bay — north */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, extent + 25]} receiveShadow>
+        <planeGeometry args={[waterWidth, 60]} />
+        <meshStandardMaterial color="#2e86c1" roughness={0.3} metalness={0.15} transparent opacity={0.85} />
       </mesh>
+      {/* East waterfront */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[extent + 20, -0.05, 10]} receiveShadow>
+        <planeGeometry args={[50, waterWidth * 0.7]} />
+        <meshStandardMaterial color="#3090cc" roughness={0.3} metalness={0.15} transparent opacity={0.8} />
+      </mesh>
+      {/* Sandy shoreline */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, extent + 0.5]}>
-        <planeGeometry args={[extent * 3, 3]} />
+        <planeGeometry args={[waterWidth, 3]} />
+        <meshStandardMaterial color="#c2b280" roughness={0.95} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[extent + 0.5, -0.01, 10]}>
+        <planeGeometry args={[2.5, waterWidth * 0.6]} />
         <meshStandardMaterial color="#c2b280" roughness={0.95} />
       </mesh>
     </group>
@@ -184,17 +190,18 @@ function BayWater({ extent }: { extent: number }) {
 
 function Parks({ gridRadius }: { gridRadius: number }) {
   const rand = mulberry32(999);
+  const parkCount = Math.max(16, gridRadius * 3);
   const parks: { x: number; z: number; w: number; d: number }[] = [];
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < parkCount; i++) {
     const gx = Math.floor((rand() - 0.5) * gridRadius * 2);
     const gz = Math.floor((rand() - 0.5) * gridRadius * 2);
     if (Math.abs(gx) <= 1 && Math.abs(gz) <= 1) continue;
     parks.push({
       x: gx * CELL + (rand() - 0.5) * 3,
       z: gz * CELL + (rand() - 0.5) * 3,
-      w: 5 + rand() * 6,
-      d: 5 + rand() * 6,
+      w: 5 + rand() * 7,
+      d: 5 + rand() * 7,
     });
   }
 
@@ -237,14 +244,105 @@ interface Props {
   occupiedLots?: Set<string>;
 }
 
+/* ── Small city artifacts (fountains, plazas, benches) ──────── */
+
+function CityArtifacts({ gridRadius }: { gridRadius: number }) {
+  const rand = mulberry32(555);
+  const items = useMemo(() => {
+    const out: { x: number; z: number; type: "fountain" | "plaza" | "bench" | "monument" }[] = [];
+    for (let i = 0; i < 18; i++) {
+      const gx = Math.floor((rand() - 0.5) * gridRadius * 2);
+      const gz = Math.floor((rand() - 0.5) * gridRadius * 2);
+      if (Math.abs(gx) <= 1 && Math.abs(gz) <= 1) continue;
+      const types = ["fountain", "plaza", "bench", "monument"] as const;
+      out.push({
+        x: gx * CELL + (rand() - 0.5) * 4,
+        z: gz * CELL + (rand() - 0.5) * 4,
+        type: types[Math.floor(rand() * types.length)],
+      });
+    }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridRadius]);
+
+  return (
+    <group>
+      {items.map((item, i) => {
+        if (item.type === "fountain") {
+          return (
+            <group key={i} position={[item.x, 0, item.z]}>
+              <mesh position={[0, 0.15, 0]}>
+                <cylinderGeometry args={[1.2, 1.4, 0.3, 16]} />
+                <meshStandardMaterial color="#b0c4d8" roughness={0.3} metalness={0.2} />
+              </mesh>
+              <mesh position={[0, 0.6, 0]}>
+                <cylinderGeometry args={[0.2, 0.3, 0.8, 8]} />
+                <meshStandardMaterial color="#c8d8e8" roughness={0.4} metalness={0.3} />
+              </mesh>
+              <mesh position={[0, 1.1, 0]}>
+                <sphereGeometry args={[0.25, 8, 8]} />
+                <meshStandardMaterial color="#88bbdd" roughness={0.2} metalness={0.4} transparent opacity={0.7} />
+              </mesh>
+            </group>
+          );
+        }
+        if (item.type === "plaza") {
+          return (
+            <group key={i}>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[item.x, 0.025, item.z]}>
+                <circleGeometry args={[2.5, 24]} />
+                <meshStandardMaterial color="#d0c8b8" roughness={0.85} />
+              </mesh>
+              {[0, 1.57, 3.14, 4.71].map((angle, j) => (
+                <mesh key={j} position={[item.x + Math.cos(angle) * 1.8, 0.25, item.z + Math.sin(angle) * 1.8]}>
+                  <boxGeometry args={[0.8, 0.35, 0.3]} />
+                  <meshStandardMaterial color="#8a7a6a" roughness={0.8} />
+                </mesh>
+              ))}
+            </group>
+          );
+        }
+        if (item.type === "monument") {
+          return (
+            <group key={i} position={[item.x, 0, item.z]}>
+              <mesh position={[0, 0.4, 0]}>
+                <boxGeometry args={[1.2, 0.8, 1.2]} />
+                <meshStandardMaterial color="#c0b8a8" roughness={0.6} metalness={0.15} />
+              </mesh>
+              <mesh position={[0, 1.6, 0]} castShadow>
+                <cylinderGeometry args={[0.15, 0.2, 2, 8]} />
+                <meshStandardMaterial color="#d8d0c0" roughness={0.5} metalness={0.2} />
+              </mesh>
+              <mesh position={[0, 2.7, 0]}>
+                <sphereGeometry args={[0.2, 8, 8]} />
+                <meshStandardMaterial color="#d0c8b0" roughness={0.4} metalness={0.3} />
+              </mesh>
+            </group>
+          );
+        }
+        return (
+          <group key={i} position={[item.x, 0, item.z]}>
+            <mesh position={[0, 0.2, 0]}>
+              <boxGeometry args={[1.2, 0.35, 0.35]} />
+              <meshStandardMaterial color="#7a8a70" roughness={0.8} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Main export ─────────────────────────────────────────────── */
+
 export function CityGround({ active, competitorCount = 0, occupiedLots }: Props) {
-  const gridRadius = Math.max(3, Math.ceil(Math.sqrt(Math.max(competitorCount, 4) + 1)) + 1);
-  const groundSize = (gridRadius + 1) * CELL * 2 + 20;
+  const gridRadius = Math.max(5, Math.ceil(Math.sqrt(Math.max(competitorCount, 4) + 1)) + 2);
+  const groundSize = (gridRadius + 2) * CELL * 2 + 40;
   const occupied = occupiedLots ?? new Set<string>();
 
   return (
     <group>
-      {/* Ground terrain — always sandy city ground */}
+      {/* Ground terrain — extended to prevent white edges */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <planeGeometry args={[groundSize, groundSize]} />
         <meshStandardMaterial color="#e8e2d6" roughness={0.95} metalness={0} />
@@ -257,6 +355,7 @@ export function CityGround({ active, competitorCount = 0, occupiedLots }: Props)
         shrink={active}
       />
       <Parks gridRadius={gridRadius} />
+      <CityArtifacts gridRadius={gridRadius} />
       <BayWater extent={gridRadius * CELL} />
     </group>
   );

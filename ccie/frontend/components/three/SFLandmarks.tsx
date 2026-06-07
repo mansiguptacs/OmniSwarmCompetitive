@@ -11,7 +11,7 @@ function GoldenGateBridge() {
   const towerH = 22;
   const deckY = 6;
   const span = 40;
-  const z = 55;
+  const z = 70;
 
   return (
     <group position={[0, 0, z]}>
@@ -92,7 +92,7 @@ function GoldenGateBridge() {
 
 function TransamericaPyramid() {
   return (
-    <group position={[-42, 0, -15]}>
+    <group position={[-55, 0, -20]}>
       {/* Pyramid body */}
       <mesh position={[0, 10, 0]} castShadow>
         <coneGeometry args={[3.5, 20, 4]} />
@@ -117,7 +117,7 @@ function TransamericaPyramid() {
 
 function CoitTower() {
   return (
-    <group position={[40, 0, -30]}>
+    <group position={[55, 0, -40]}>
       {/* Hill */}
       <mesh position={[0, 1.5, 0]}>
         <sphereGeometry args={[5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -147,7 +147,7 @@ function CoitTower() {
 
 function CableCar() {
   return (
-    <group position={[12, 0, -38]}>
+    <group position={[15, 0, -50]}>
       {/* Track rails */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <planeGeometry args={[30, 0.8]} />
@@ -184,7 +184,7 @@ function CableCar() {
 
 function PierSign() {
   return (
-    <group position={[30, 0, 48]}>
+    <group position={[35, 0, 62]}>
       {/* Pier deck */}
       <mesh position={[0, 0.3, 0]} receiveShadow>
         <boxGeometry args={[14, 0.4, 6]} />
@@ -215,7 +215,7 @@ function PierSign() {
 /** Salesforce Tower — tallest building in SF skyline */
 function SalesforceTower() {
   return (
-    <group position={[-30, 0, 20]}>
+    <group position={[-40, 0, 28]}>
       <mesh position={[0, 14, 0]} castShadow>
         <cylinderGeometry args={[2.2, 2.5, 28, 16]} />
         <meshStandardMaterial color="#b8c8d8" roughness={0.2} metalness={0.5} />
@@ -237,7 +237,7 @@ function SalesforceTower() {
 function PaintedLadies() {
   const colors = ["#e8a0a0", "#a0c8e8", "#b8e0a0", "#e8d0a0", "#c8a0d8"];
   return (
-    <group position={[-45, 0, 15]}>
+    <group position={[-58, 0, 18]}>
       {colors.map((c, i) => (
         <group key={i} position={[i * 2.8, 0, 0]}>
           <mesh position={[0, 1.5, 0]} castShadow>
@@ -277,7 +277,7 @@ function PaintedLadies() {
 /** Alcatraz — small island with building in the bay */
 function Alcatraz() {
   return (
-    <group position={[45, -0.1, 65]}>
+    <group position={[55, -0.1, 82]}>
       {/* Island */}
       <mesh position={[0, 0.4, 0]}>
         <cylinderGeometry args={[4, 5, 0.8, 12]} />
@@ -316,6 +316,100 @@ function TrolleyTracks() {
   );
 }
 
+/** Ferry Building — clock tower on the waterfront */
+function FerryBuilding() {
+  return (
+    <group position={[0, 0, 62]}>
+      <mesh position={[0, 2, 0]} castShadow>
+        <boxGeometry args={[16, 4, 3.5]} />
+        <meshStandardMaterial color="#e8dcc8" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 4.5, 0]} castShadow>
+        <boxGeometry args={[1.8, 5, 1.8]} />
+        <meshStandardMaterial color="#d8ccb8" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 7.5, 0]}>
+        <coneGeometry args={[1.2, 2, 4]} />
+        <meshStandardMaterial color="#b8a888" roughness={0.5} />
+      </mesh>
+      <Html position={[0, 9.5, 0]} center zIndexRange={[1, 0]}>
+        <div style={{ fontSize: 9, color: "#8b7355", fontWeight: 600, whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(255,255,255,0.9)" }}>
+          Ferry Building
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Marina with small boats */
+function Marina() {
+  return (
+    <group position={[-35, 0, 68]}>
+      {/* Dock */}
+      <mesh position={[0, 0.2, 0]} receiveShadow>
+        <boxGeometry args={[20, 0.3, 2]} />
+        <meshStandardMaterial color="#c4a97d" roughness={0.85} />
+      </mesh>
+      {/* Boats */}
+      {[-6, -2, 2, 5, 8].map((x, i) => (
+        <group key={i} position={[x, 0.15, 3 + (i % 2) * 1.5]}>
+          <mesh>
+            <boxGeometry args={[1.5, 0.3, 0.7]} />
+            <meshStandardMaterial color={["#f5f0e8", "#e0d5c5", "#d0e0f0", "#f0e0d0", "#e5e5e0"][i]} roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.6, 0]}>
+            <boxGeometry args={[0.06, 0.9, 0.06]} />
+            <meshStandardMaterial color="#8a7a6a" roughness={0.7} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Dolores Park — large green area */
+function DoloresPark() {
+  return (
+    <group position={[-50, 0, -40]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <planeGeometry args={[18, 14]} />
+        <meshStandardMaterial color="#5a9a4e" roughness={0.95} />
+      </mesh>
+      {/* Walking paths */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <planeGeometry args={[0.4, 14]} />
+        <meshStandardMaterial color="#c8bca8" roughness={0.9} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, Math.PI / 4]} position={[3, 0.03, 2]}>
+        <planeGeometry args={[0.3, 10]} />
+        <meshStandardMaterial color="#c8bca8" roughness={0.9} />
+      </mesh>
+      {/* Trees along edges */}
+      {Array.from({ length: 8 }).map((_, i) => {
+        const x = -7 + i * 2 + (i % 2) * 0.5;
+        const z = (i % 2 === 0 ? -5 : 5) + (i % 3) * 0.5;
+        return (
+          <group key={i} position={[x, 0, z]} scale={0.7 + (i % 3) * 0.15}>
+            <mesh position={[0, 0.5, 0]} castShadow>
+              <cylinderGeometry args={[0.08, 0.12, 1, 6]} />
+              <meshStandardMaterial color="#8b6b4a" />
+            </mesh>
+            <mesh position={[0, 1.3, 0]} castShadow>
+              <sphereGeometry args={[0.6, 8, 8]} />
+              <meshStandardMaterial color="#3d8c4f" roughness={0.9} />
+            </mesh>
+          </group>
+        );
+      })}
+      <Html position={[0, 3, 0]} center zIndexRange={[1, 0]}>
+        <div style={{ fontSize: 9, color: "#4a7a3a", fontWeight: 600, whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(255,255,255,0.9)" }}>
+          Dolores Park
+        </div>
+      </Html>
+    </group>
+  );
+}
+
 export function SFLandmarks() {
   return (
     <group>
@@ -328,6 +422,9 @@ export function SFLandmarks() {
       <PaintedLadies />
       <Alcatraz />
       <TrolleyTracks />
+      <FerryBuilding />
+      <Marina />
+      <DoloresPark />
     </group>
   );
 }

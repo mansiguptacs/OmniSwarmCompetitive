@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentActivity, Competitor } from "@/types/ccie";
+import type { AgentActivity, Competitor, Phase } from "@/types/ccie";
 
 const AGENT_META: Record<string, { icon: string; color: string; label: string }> = {
   "News Scout": { icon: "N", color: "#60a5fa", label: "News" },
@@ -9,6 +9,12 @@ const AGENT_META: Record<string, { icon: string; color: string; label: string }>
   "Financial Analyst": { icon: "F", color: "#f59e0b", label: "Financials" },
   Synthesis: { icon: "S", color: "#c084fc", label: "SWOT" },
   Orchestrator: { icon: "O", color: "#a78bfa", label: "Orchestrator" },
+};
+
+const PHASE_INFO: Partial<Record<Phase, { label: string; detail: string; color: string; icon: string }>> = {
+  classifying: { label: "Classifying Input", detail: "Analyzing company type, industry, and market segment...", color: "#a855f7", icon: "🔎" },
+  discovering: { label: "Discovering Competitors", detail: "Searching market landscape to identify key competitors...", color: "#3b82f6", icon: "🌐" },
+  synthesizing: { label: "Synthesizing Intelligence", detail: "Building competitive landscape, SWOT analysis, and threat scoring...", color: "#f59e0b", icon: "⚡" },
 };
 
 const AGENT_ORDER = ["News Scout", "Product Tracker", "Financial Analyst", "Synthesis"];
@@ -28,9 +34,11 @@ function stripCompanyName(status: string, name: string): string {
 export function AnalysisToast({
   competitors,
   activity,
+  phase,
 }: {
   competitors: Competitor[];
   activity?: AgentActivity[];
+  phase?: Phase;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -79,36 +87,107 @@ export function AnalysisToast({
   const totalCount = competitors.length;
   const msgs = activity ?? [];
 
-  if (totalCount === 0) return null;
+  const phaseInfo = phase ? PHASE_INFO[phase] : undefined;
+  const showPhaseToast = !!phaseInfo && (visible.length === 0 || phase === "synthesizing");
+  const latestActivity = msgs[msgs.length - 1];
 
-  const MAX_SHOWN = 3;
+  if (totalCount === 0 && !showPhaseToast) return null;
+
+  const MAX_SHOWN = 6;
   const shown = visible.slice(0, MAX_SHOWN);
   const overflow = visible.length - MAX_SHOWN;
 
+  const SLOT_POSITIONS = [
+    { top: "15%", left: "8%" },
+    { top: "12%", right: "8%" },
+    { top: "40%", left: "5%" },
+    { top: "38%", right: "5%" },
+    { top: "62%", left: "10%" },
+    { top: "60%", right: "10%" },
+  ];
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 80,
-        left: 20,
-        zIndex: 80,
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        maxHeight: "calc(100vh - 260px)",
-        overflowY: "auto",
-        pointerEvents: "none",
-        width: 320,
-      }}
-    >
-      {/* Progress counter */}
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, pointerEvents: "none" }}>
+
+      {/* Phase-level toast — shown during classifying, discovering, synthesizing */}
+      {showPhaseToast && phaseInfo && (
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 340,
+          background: "rgba(15,23,42,0.94)",
+          backdropFilter: "blur(16px)",
+          border: `1px solid ${phaseInfo.color}30`,
+          borderRadius: 14,
+          padding: "20px 24px",
+          animation: "fadeInUp 0.4s ease",
+          boxShadow: `0 12px 40px rgba(0,0,0,0.4), 0 0 20px ${phaseInfo.color}10`,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: `${phaseInfo.color}15`,
+              border: `1.5px solid ${phaseInfo.color}40`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 18,
+              animation: "pulse-glow 2s infinite",
+            }}>
+              {phaseInfo.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>
+                {phaseInfo.label}
+              </div>
+              <div style={{ fontSize: 11, color: phaseInfo.color, fontWeight: 600 }}>
+                Processing...
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.55, marginBottom: latestActivity ? 10 : 0 }}>
+            {phaseInfo.detail}
+          </div>
+          {latestActivity && (
+            <div style={{
+              fontSize: 11, color: "#64748b", lineHeight: 1.4,
+              padding: "8px 10px", borderRadius: 8,
+              background: "rgba(148,163,184,0.04)",
+              borderLeft: `3px solid ${phaseInfo.color}40`,
+              animation: "fadeInUp 0.2s ease",
+            }}>
+              <span style={{ color: AGENT_META[latestActivity.agent]?.color ?? "#94a3b8", fontWeight: 600, marginRight: 4, fontSize: 10 }}>
+                {AGENT_META[latestActivity.agent]?.label ?? latestActivity.agent}
+              </span>
+              {latestActivity.status}
+            </div>
+          )}
+          {/* Animated progress dots */}
+          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 14 }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{
+                width: 6, height: 6, borderRadius: 999,
+                background: phaseInfo.color,
+                opacity: 0.4,
+                animation: `pulse-glow 1.5s infinite ${i * 0.3}s`,
+              }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Progress counter — top center */}
       {totalCount > 0 && (totalDone > 0 || analyzing.length > 0) && (
         <div
           style={{
+            position: "absolute",
+            top: 80,
+            left: "50%",
+            transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
             gap: 10,
-            padding: "8px 14px",
+            padding: "8px 18px",
             background: "rgba(15,23,42,0.92)",
             backdropFilter: "blur(12px)",
             borderRadius: 8,
@@ -123,7 +202,6 @@ export function AnalysisToast({
               {totalDone}/{totalCount} complete
             </div>
           </div>
-          {/* Mini progress bar */}
           <div style={{ width: 60, height: 4, borderRadius: 2, background: "rgba(148,163,184,0.15)" }}>
             <div
               style={{
@@ -138,8 +216,8 @@ export function AnalysisToast({
         </div>
       )}
 
-      {/* Per-company cards */}
-      {shown.map((c) => {
+      {/* Per-company cards scattered across the viewport */}
+      {shown.map((c, idx) => {
         const done = c.status === "complete";
         const companyMsgs = msgs.filter((m) => m.status.includes(c.name));
 
@@ -154,10 +232,15 @@ export function AnalysisToast({
         const activeAgent = agentProgress.find((a) => a.hasStarted && !a.isDone);
         const latestMsg = activeAgent?.last ?? companyMsgs[companyMsgs.length - 1];
 
+        const slot = SLOT_POSITIONS[idx % SLOT_POSITIONS.length];
+
         return (
           <div
             key={c.name}
             style={{
+              position: "absolute",
+              ...slot,
+              width: 280,
               background: done
                 ? "rgba(34,197,94,0.08)"
                 : "rgba(15,23,42,0.94)",
@@ -167,9 +250,10 @@ export function AnalysisToast({
                 : "1px solid rgba(148,163,184,0.1)",
               borderRadius: 10,
               padding: "12px 14px",
-              animation: "fadeInUp 0.3s ease",
+              animation: "fadeInUp 0.4s ease",
               transition: "all 0.3s",
               pointerEvents: "auto",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
             }}
           >
             {/* Header */}
@@ -248,28 +332,34 @@ export function AnalysisToast({
               </div>
             )}
 
-            {/* Current action */}
-            {latestMsg && !done && (
-              <div style={{
-                fontSize: 11,
-                color: "#94a3b8",
-                lineHeight: 1.45,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical" as never,
-                animation: "fadeInUp 0.2s ease",
-              }}>
-                <span style={{
-                  color: AGENT_META[latestMsg.agent]?.color ?? "#94a3b8",
-                  fontWeight: 600,
-                  marginRight: 4,
-                  fontSize: 10,
-                }}>
-                  {AGENT_META[latestMsg.agent]?.label ?? latestMsg.agent}
-                </span>
-                {stripCompanyName(latestMsg.status, c.name)}
+            {/* Live agent log — last 3 messages for this company */}
+            {!done && companyMsgs.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {companyMsgs.slice(-3).map((m, mi) => {
+                  const isLatest = mi === Math.min(companyMsgs.length, 3) - 1;
+                  return (
+                    <div key={`${m.ts}-${mi}`} style={{
+                      fontSize: 10,
+                      color: isLatest ? "#cbd5e1" : "#64748b",
+                      lineHeight: 1.4,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      animation: isLatest ? "fadeInUp 0.2s ease" : undefined,
+                      opacity: isLatest ? 1 : 0.6,
+                    }}>
+                      <span style={{
+                        color: AGENT_META[m.agent]?.color ?? "#64748b",
+                        fontWeight: 600,
+                        marginRight: 4,
+                        fontSize: 9,
+                      }}>
+                        {AGENT_META[m.agent]?.label ?? m.agent}
+                      </span>
+                      {stripCompanyName(m.status, c.name)}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -284,9 +374,13 @@ export function AnalysisToast({
 
       {overflow > 0 && (
         <div style={{
+          position: "absolute",
+          bottom: 160,
+          left: "50%",
+          transform: "translateX(-50%)",
           fontSize: 11,
           color: "#64748b",
-          padding: "6px 12px",
+          padding: "6px 16px",
           background: "rgba(15,23,42,0.85)",
           borderRadius: 8,
           border: "1px solid rgba(148,163,184,0.08)",

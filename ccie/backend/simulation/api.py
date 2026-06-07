@@ -1,4 +1,4 @@
-"""FastAPI routes that expose the war-game simulator to the frontend.
+"""FastAPI routes that expose the M&A scenario analysis simulator to the frontend.
 
 Thin transport layer over `simulation.session`. Returns the full
 `SimulationState` so the UI can render the board, reactions, and decision point.
@@ -7,21 +7,25 @@ Mounted additively in `main.py`; the baseline CCIE agent is untouched.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from simulation.roster import DEFAULT_SECTOR
 from simulation.schemas import SimulationState
 from simulation.session import (
     advance_simulation,
+    advance_simulation_stream,
     end_simulation,
     fork_simulation,
     get_evals,
     get_replay,
     get_simulation,
     start_simulation,
+    start_simulation_stream,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +76,52 @@ async def sim_start(req: StartRequest) -> SimulationState:
     except Exception as exc:
         logger.exception("sim start failed")
         raise HTTPException(status_code=500, detail=f"start failed: {exc}") from exc
+
+
+@router.post("/start/stream")
+async def sim_start_stream(req: StartRequest):
+    """SSE endpoint — streams progress events during simulation start."""
+    if not req.target.strip() or not req.player.strip():
+        raise HTTPException(status_code=400, detail="target and player are required")
+
+    async def _generate():
+        try:
+            async for event in start_simulation_stream(
+                req.target.strip(),
+                req.player.strip(),
+                sector_id=req.sector,
+                initial_move=req.initial_move,
+                max_iterations=req.max_iterations,
+                max_incumbents=req.max_incumbents,
+                seed=req.seed,
+            ):
+                yield f"data: {json.dumps(event, default=str)}\n\n"
+        except Exception as exc:
+            logger.exception("sim start stream failed")
+            yield f"data: {json.dumps({'kind': 'error', 'name': None, 'data': str(exc)})}\n\n"
+
+    return StreamingResponse(_generate(), media_type="text/event-stream")
+
+
+@router.post("/advance/stream")
+async def sim_advance_stream(req: AdvanceRequest):
+    """SSE endpoint — streams progress events during simulation advance."""
+    if not req.choice.strip():
+        raise HTTPException(status_code=400, detail="choice is required")
+
+    async def _generate():
+        try:
+            async for event in advance_simulation_stream(
+                req.session_id, req.choice.strip()
+            ):
+                yield f"data: {json.dumps(event, default=str)}\n\n"
+        except ValueError as exc:
+            yield f"data: {json.dumps({'kind': 'error', 'name': None, 'data': str(exc)})}\n\n"
+        except Exception as exc:
+            logger.exception("sim advance stream failed")
+            yield f"data: {json.dumps({'kind': 'error', 'name': None, 'data': str(exc)})}\n\n"
+
+    return StreamingResponse(_generate(), media_type="text/event-stream")
 
 
 @router.post("/advance", response_model=SimulationState)

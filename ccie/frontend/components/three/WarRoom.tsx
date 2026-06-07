@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
   OrbitControls,
@@ -16,6 +16,38 @@ import { TargetTower } from "./TargetTower";
 import { Roads } from "./Roads";
 import { AgentCluster } from "./AgentCluster";
 import { SFLandmarks } from "./SFLandmarks";
+
+const ZOOM_IDLE = 15;
+const ZOOM_ACTIVE = 9;
+
+function CameraZoomController({ active }: { active: boolean }) {
+  const { camera } = useThree();
+  const targetZoom = active ? ZOOM_ACTIVE : ZOOM_IDLE;
+  const prevActive = useRef(active);
+  const animating = useRef(false);
+
+  useEffect(() => {
+    if (prevActive.current !== active) {
+      prevActive.current = active;
+      animating.current = true;
+    }
+  }, [active]);
+
+  useFrame((_, delta) => {
+    if (!animating.current) return;
+    const diff = targetZoom - camera.zoom;
+    if (Math.abs(diff) < 0.05) {
+      camera.zoom = targetZoom;
+      camera.updateProjectionMatrix();
+      animating.current = false;
+    } else {
+      camera.zoom += diff * Math.min(1, delta * 1.8);
+      camera.updateProjectionMatrix();
+    }
+  });
+
+  return null;
+}
 
 interface Props {
   target: string;
@@ -76,9 +108,10 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
         rayleigh={0.4}
       />
 
-      <fog attach="fog" args={["#e0ecf8", 120, 250]} />
+      <fog attach="fog" args={["#e0ecf8", 140, 320]} />
 
-      <OrthographicCamera makeDefault position={[50, 42, 50]} zoom={11} near={-300} far={600} />
+      <OrthographicCamera makeDefault position={[60, 48, 60]} zoom={ZOOM_IDLE} near={-400} far={800} />
+      <CameraZoomController active={hasTarget} />
       <OrbitControls
         enablePan
         enableDamping
@@ -87,21 +120,23 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
         maxZoom={50}
         maxPolarAngle={Math.PI / 2.2}
         target={[0, 4, 0]}
+        autoRotate
+        autoRotateSpeed={0.3}
       />
 
       <ambientLight intensity={0.85} color="#fffaf0" />
       <hemisphereLight args={["#87ceeb", "#a0d468", 0.65]} />
       <directionalLight
-        position={[40, 55, 30]}
+        position={[50, 65, 40]}
         intensity={2.2}
         color="#fff5e0"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-camera-left={-80}
-        shadow-camera-right={80}
-        shadow-camera-top={80}
-        shadow-camera-bottom={-80}
+        shadow-camera-left={-120}
+        shadow-camera-right={120}
+        shadow-camera-top={120}
+        shadow-camera-bottom={-120}
       />
       <directionalLight position={[-20, 30, -10]} intensity={0.45} color="#b3d4fc" />
 
@@ -140,9 +175,9 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
         <ContactShadows
           position={[0, 0.01, 0]}
           opacity={0.25}
-          scale={120}
+          scale={180}
           blur={2.5}
-          far={25}
+          far={30}
           color="#4a5568"
         />
       </Suspense>
