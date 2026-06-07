@@ -3,7 +3,13 @@ from langchain_core.messages import HumanMessage
 from llm.discovery import extract_competitors_from_search
 from llm.factory import get_llm
 from llm.heuristic import heuristic_classify, heuristic_discover, _supplement_known_map
-from llm.schemas import ClassifyResult, DiscoveryResult, SwotResult
+from llm.schemas import (
+    ClassifyResult,
+    CompetitorScore,
+    DiscoveryResult,
+    LandscapeScores,
+    SwotResult,
+)
 from state import Competitor, NewsItem
 from tools.web_search import search_news
 
@@ -17,6 +23,10 @@ def _build_hypothetical_queries(description: str, target_company: str) -> list[s
         queries.append(f"startups {' '.join(words[:8])} market landscape")
     queries.append(f"companies similar to {desc[:80]}")
     return queries[:3]
+
+
+def _clamp01(value: float) -> float:
+    return round(max(0.0, min(1.0, value)), 3)
 
 
 def _format_search_context(items: list[NewsItem]) -> str:
@@ -214,6 +224,74 @@ async def generate_swot_for_competitor(
         )
 
 
+def _heuristic_scores(competitors: list[Competitor]) -> dict[str, CompetitorScore]:
+    """Differentiated fallback scores (avoids the all-0.9 saturation).
+
+    Discovery returns competitors roughly by relevance, so earlier entries get
+    higher base scores; sentiment nudges threat. Spread keeps buildings distinct.
+    """
+    out: dict[str, CompetitorScore] = {}
+    total = max(1, len(competitors))
+    for i, c in enumerate(competitors):
+        rank = 1.0 - (i / total)  # first listed → ~1.0, last → small
+        sent = (c.sentiment + 1) / 2  # 0..1
+        out[c.name] = CompetitorScore(
+            name=c.name,
+            threat_level=_clamp01(0.35 + rank * 0.45 + sent * 0.12),
+            market_size=_clamp01(0.30 + rank * 0.55),
+            market_overlap=_clamp01(0.40 + rank * 0.30 + sent * 0.08),
+        )
+    return out
+
+
+async def score_competitors(
+    target_company: str,
+    competitors: list[Competitor],
+) -> dict[str, CompetitorScore]:
+    """Score each competitor (threat/size/overlap) using the model's real-world
+    knowledge so the 3D buildings differ. Falls back to a varied heuristic."""
+    if not competitors:
+        return {}
+
+    fallback = _heuristic_scores(competitors)
+    llm = get_llm()
+    if llm is None:
+        return fallback
+
+    names = ", ".join(c.name for c in competitors)
+    structured = llm.with_structured_output(LandscapeScores)
+    prompt = (
+        "Score these competitors of a target company for a competitive map.\n"
+        "For EACH competitor give three floats from 0.0 to 1.0 that MUST vary "
+        "meaningfully between competitors (do not give everyone the same value):\n"
+        "- threat_level: competitive threat to the target (market power + momentum)\n"
+        "- market_size: relative company size / overall market presence\n"
+        "- market_overlap: how directly it competes with the target's core business\n\n"
+        f"Target: {target_company or 'N/A'}\n"
+        f"Competitors: {names}\n"
+        "Use real-world knowledge of each company's size and positioning."
+    )
+    try:
+        result = await structured.ainvoke([HumanMessage(content=prompt)])
+        parsed = result if isinstance(result, LandscapeScores) else LandscapeScores.model_validate(result)
+        by_name = {s.name.strip().lower(): s for s in parsed.scores}
+        merged: dict[str, CompetitorScore] = {}
+        for c in competitors:
+            s = by_name.get(c.name.strip().lower())
+            if s is None:
+                merged[c.name] = fallback[c.name]
+            else:
+                merged[c.name] = CompetitorScore(
+                    name=c.name,
+                    threat_level=_clamp01(s.threat_level),
+                    market_size=_clamp01(s.market_size),
+                    market_overlap=_clamp01(s.market_overlap),
+                )
+        return merged
+    except Exception:
+        return fallback
+
+
 async def generate_landscape_summary(
     target_company: str,
     competitors: list[Competitor],
@@ -242,7 +320,9 @@ async def generate_landscape_summary(
     fin_text = "; ".join(fin_summary_parts) if fin_summary_parts else "Not available"
 
     prompt = (
-        "Write a 2-3 sentence executive summary of this competitive landscape.\n"
+        "Write a punchy 1-2 sentence executive summary of this competitive "
+        "landscape (max ~40 words). Name only the 2-3 most important rivals; "
+        "do not list every competitor.\n"
         f"Target: {target_company or 'N/A'}\n"
         f"Competitors: {names}\n"
         f"Financial highlights: {fin_text}\n"

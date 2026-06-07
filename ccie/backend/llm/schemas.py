@@ -23,6 +23,17 @@ class FinancialResult(BaseModel):
     source: str = ""
 
 
+class CompetitorScore(BaseModel):
+    name: str
+    threat_level: float = 0.5
+    market_size: float = 0.5
+    market_overlap: float = 0.5
+
+
+class LandscapeScores(BaseModel):
+    scores: list[CompetitorScore] = Field(default_factory=list)
+
+
 class SwotResult(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)

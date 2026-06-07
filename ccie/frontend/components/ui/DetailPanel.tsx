@@ -3,6 +3,20 @@
 import type { Competitor } from "@/types/ccie";
 import { sentimentColor, sentimentLabel } from "@/lib/visuals";
 
+const MAX_PRODUCTS = 4;
+const MAX_NEWS = 4;
+const MAX_SWOT = 3;
+
+function MoreHint({ count, noun }: { count: number; noun: string }) {
+  if (count <= 0) return null;
+  return (
+    <div style={{ fontSize: 12, color: "#7c8aa0", marginTop: 2 }}>
+      +{count} more {noun}
+      {count === 1 ? "" : "s"}
+    </div>
+  );
+}
+
 function Meter({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   return (
@@ -80,21 +94,19 @@ export function DetailPanel({
 
       {!!competitor.products?.length && (
         <Section title="Products">
-          {competitor.products!.map((p, i) => (
+          {competitor.products!.slice(0, MAX_PRODUCTS).map((p, i) => (
             <div key={i} style={{ fontSize: 13, marginBottom: 6 }}>
               <strong style={{ color: "#e5e7eb" }}>{p.name}</strong>
               {p.pricing && <span style={{ color: "#9ca3af" }}> · {p.pricing}</span>}
-              {p.description && (
-                <div style={{ color: "#9ca3af", fontSize: 12.5 }}>{p.description}</div>
-              )}
             </div>
           ))}
+          <MoreHint count={competitor.products!.length - MAX_PRODUCTS} noun="product" />
         </Section>
       )}
 
       {!!competitor.news?.length && (
         <Section title="Latest news">
-          {competitor.news!.map((n, i) => (
+          {competitor.news!.slice(0, MAX_NEWS).map((n, i) => (
             <div key={i} style={{ fontSize: 13, marginBottom: 6, display: "flex", gap: 8 }}>
               <span
                 style={{
@@ -116,6 +128,7 @@ export function DetailPanel({
               </a>
             </div>
           ))}
+          <MoreHint count={competitor.news!.length - MAX_NEWS} noun="story" />
         </Section>
       )}
 
@@ -127,7 +140,7 @@ export function DetailPanel({
                 {k}
               </div>
               <ul style={{ margin: "4px 0 0", paddingLeft: 18, color: "#cbd5e1", fontSize: 12.5 }}>
-                {(items as string[]).map((it, i) => (
+                {(items as string[]).slice(0, MAX_SWOT).map((it, i) => (
                   <li key={i}>{it}</li>
                 ))}
               </ul>
