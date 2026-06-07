@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import * as THREE from "three";
 
 const BLOCK = 9;
@@ -243,7 +242,6 @@ interface Props {
   active: boolean;
   competitorCount?: number;
   occupiedLots?: Set<string>;
-  competitorNames?: string[];
 }
 
 /* ── Small city artifacts (fountains, plazas, benches) ──────── */
@@ -335,147 +333,10 @@ function CityArtifacts({ gridRadius }: { gridRadius: number }) {
   );
 }
 
-/* ── SF Company Labels ───────────────────────────────────────── */
-
-interface SFCompany {
-  name: string;
-  short: string;
-  gx: number;
-  gz: number;
-  color: string;
-}
-
-const SF_COMPANIES: SFCompany[] = [
-  { name: "Salesforce",  short: "CRM",  gx: -2, gz: -3, color: "#00A1E0" },
-  { name: "Uber",        short: "UBER", gx:  3, gz: -2, color: "#000000" },
-  { name: "Airbnb",      short: "ABNB", gx: -3, gz:  2, color: "#FF5A5F" },
-  { name: "X (Twitter)", short: "X",    gx:  2, gz:  3, color: "#1DA1F2" },
-  { name: "Stripe",      short: "STRP", gx: -1, gz: -4, color: "#635BFF" },
-  { name: "Block",       short: "SQ",   gx:  4, gz:  1, color: "#3E4348" },
-  { name: "Lyft",        short: "LYFT", gx: -4, gz: -1, color: "#FF00BF" },
-  { name: "Dropbox",     short: "DBX",  gx:  1, gz: -3, color: "#0061FF" },
-  { name: "GitHub",      short: "GH",   gx: -3, gz: -2, color: "#24292E" },
-  { name: "Slack",       short: "WORK", gx:  3, gz:  2, color: "#4A154B" },
-  { name: "Pinterest",   short: "PINS", gx: -2, gz:  4, color: "#E60023" },
-  { name: "Twitch",      short: "TWCH", gx:  4, gz: -2, color: "#9146FF" },
-  { name: "Coinbase",    short: "COIN", gx:  2, gz: -4, color: "#0052FF" },
-  { name: "DoorDash",    short: "DASH", gx: -4, gz:  3, color: "#FF3008" },
-  { name: "Notion",      short: "NTON", gx:  1, gz:  4, color: "#000000" },
-  { name: "Figma",       short: "FIG",  gx: -1, gz:  3, color: "#F24E1E" },
-  { name: "Databricks",  short: "DBKS", gx:  4, gz: -4, color: "#FF3621" },
-  { name: "Anthropic",   short: "ANTH", gx: -3, gz: -4, color: "#D4A574" },
-  { name: "OpenAI",      short: "OAI",  gx:  3, gz:  4, color: "#10A37F" },
-  { name: "Instacart",   short: "CART", gx: -4, gz: -3, color: "#43B02A" },
-];
-
-function CompanyLabel({ company, visible }: { company: SFCompany; visible: boolean }) {
-  const [show, setShow] = useState(visible);
-
-  useEffect(() => {
-    if (visible) {
-      setShow(true);
-    } else {
-      const delay = Math.abs(company.gx + company.gz) * 120 + Math.random() * 400;
-      const t = setTimeout(() => setShow(false), delay);
-      return () => clearTimeout(t);
-    }
-  }, [visible, company.gx, company.gz]);
-
-  const rand = mulberry32(company.gx * 1000 + company.gz);
-  const buildingH = 4 + rand() * 7;
-  const x = company.gx * CELL;
-  const z = company.gz * CELL;
-
-  if (!show && !visible) return null;
-
-  return (
-    <group position={[x, buildingH + 1.2, z]}>
-      <Html center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-        <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.8s ease",
-          animation: visible ? "sf-label-float 3s ease-in-out infinite" : undefined,
-          animationDelay: `${(Math.abs(company.gx) + Math.abs(company.gz)) * 180}ms`,
-        }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 5,
-            background: "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(4px)",
-            padding: "3px 9px",
-            borderRadius: 5,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-            borderLeft: `3px solid ${company.color}`,
-            whiteSpace: "nowrap",
-          }}>
-            <span style={{
-              width: 16, height: 16, borderRadius: 3,
-              background: company.color,
-              color: "#fff",
-              fontSize: 8, fontWeight: 800,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              {company.name.charAt(0)}
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#334155", letterSpacing: "-0.01em" }}>
-              {company.name}
-            </span>
-            <span style={{
-              fontSize: 8, fontWeight: 600, color: "#94a3b8",
-              padding: "1px 4px", borderRadius: 3,
-              background: "rgba(148,163,184,0.12)",
-            }}>
-              {company.short}
-            </span>
-          </div>
-          <div style={{
-            width: 1, height: 6,
-            background: `linear-gradient(${company.color}, transparent)`,
-          }} />
-        </div>
-      </Html>
-    </group>
-  );
-}
-
-function SFCompanyLabels({
-  active,
-  competitorNames,
-}: {
-  active: boolean;
-  competitorNames: string[];
-}) {
-  const normalizedCompetitors = useMemo(
-    () => competitorNames.map(n => n.toLowerCase().trim()),
-    [competitorNames],
-  );
-
-  useEffect(() => {
-    const id = "sf-label-float-style";
-    if (document.getElementById(id)) return;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = `@keyframes sf-label-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }`;
-    document.head.appendChild(style);
-  }, []);
-
-  return (
-    <group>
-      {SF_COMPANIES.map((co) => {
-        const isCompetitor = normalizedCompetitors.some(cn =>
-          cn.includes(co.name.toLowerCase()) || co.name.toLowerCase().includes(cn)
-        );
-        const show = !active || isCompetitor;
-        return <CompanyLabel key={co.name} company={co} visible={show} />;
-      })}
-    </group>
-  );
-}
 
 /* ── Main export ─────────────────────────────────────────────── */
 
-export function CityGround({ active, competitorCount = 0, occupiedLots, competitorNames = [] }: Props) {
+export function CityGround({ active, competitorCount = 0, occupiedLots }: Props) {
   const gridRadius = Math.max(5, Math.ceil(Math.sqrt(Math.max(competitorCount, 4) + 1)) + 2);
   const groundSize = (gridRadius + 2) * CELL * 2 + 40;
   const occupied = occupiedLots ?? new Set<string>();
@@ -497,7 +358,6 @@ export function CityGround({ active, competitorCount = 0, occupiedLots, competit
       <Parks gridRadius={gridRadius} />
       <CityArtifacts gridRadius={gridRadius} />
       <BayWater extent={gridRadius * CELL} />
-      <SFCompanyLabels active={active} competitorNames={competitorNames} />
     </group>
   );
 }

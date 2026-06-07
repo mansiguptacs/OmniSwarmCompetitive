@@ -140,9 +140,17 @@ export function PhaseBar({
             cursor: !input.trim() || isActive ? "not-allowed" : "pointer",
             transition: "all 0.2s",
             flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
-          Analyze
+          {isActive && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" strokeDasharray="50 20" strokeLinecap="round" />
+            </svg>
+          )}
+          {isActive ? "Analyzing" : "Analyze"}
         </button>
       </form>
 

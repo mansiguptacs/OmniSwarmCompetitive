@@ -16,9 +16,10 @@ import { TargetTower } from "./TargetTower";
 import { Roads } from "./Roads";
 import { AgentCluster } from "./AgentCluster";
 import { SFLandmarks } from "./SFLandmarks";
+import { SFCompanyLabels } from "./SFCompanyLabels";
 
 const ZOOM_IDLE = 15;
-const ZOOM_ACTIVE = 9;
+const ZOOM_ACTIVE = 12;
 
 function CameraZoomController({ active }: { active: boolean }) {
   const { camera } = useThree();
@@ -147,10 +148,10 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
           active={hasTarget}
           competitorCount={competitors.length}
           occupiedLots={occupiedLots}
-          competitorNames={competitorNames}
         />
 
         <SFLandmarks />
+        <SFCompanyLabels active={hasTarget} competitorNames={competitorNames} />
 
         {hasTarget && positions.length > 0 && <Roads positions={positions} />}
 
