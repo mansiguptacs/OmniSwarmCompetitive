@@ -521,9 +521,12 @@ interface SimOverlayProps {
   targetCompany: string;
   competitors: string[];
   onClose: () => void;
+  onStateChange?: (state: SimulationState | null) => void;
+  onLoadingChange?: (loading: boolean) => void;
+  onChooseReady?: (chooseFn: (choice: string) => void) => void;
 }
 
-export function SimOverlay({ targetCompany, competitors, onClose }: SimOverlayProps) {
+export function SimOverlay({ targetCompany, competitors, onClose, onStateChange, onLoadingChange, onChooseReady }: SimOverlayProps) {
   const [state, setState] = useState<SimulationState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -547,6 +550,8 @@ export function SimOverlay({ targetCompany, competitors, onClose }: SimOverlayPr
   const personas = state?.personas ?? [];
 
   useEffect(() => { setTab("responses"); setExpandedReaction(null); }, [state?.current_index]);
+  useEffect(() => { onStateChange?.(state); }, [state, onStateChange]);
+  useEffect(() => { onLoadingChange?.(loading); }, [loading, onLoadingChange]);
 
   const handleEvent = useCallback((evt: SimProgressEvent) => {
     if (evt.kind === "personas") {
@@ -593,10 +598,21 @@ export function SimOverlay({ targetCompany, competitors, onClose }: SimOverlayPr
     setError(null);
     setPendingPhase(1);
     setLiveStage("grounding");
-    setLiveAgents(competitors.slice(0, 6).map((c) => ({ name: c, status: "queued" as AgentStatus })));
+
+    const exclude = new Set([targetCompany, target].map((s) => s.toLowerCase().trim()));
+    const incumbents = competitors.filter((c) => !exclude.has(c.toLowerCase().trim()));
+    const cap = Math.min(incumbents.length, 8);
+
+    setLiveAgents(incumbents.slice(0, cap).map((c) => ({ name: c, status: "queued" as AgentStatus })));
     try {
       const next = await startSimulationStream(
-        { target, player: targetCompany, max_iterations: depth, max_incumbents: Math.min(competitors.length, 6) },
+        {
+          target,
+          player: targetCompany,
+          max_iterations: depth,
+          max_incumbents: cap,
+          incumbents: incumbents.slice(0, cap),
+        },
         handleEvent,
       );
       setState(next);
@@ -629,12 +645,18 @@ export function SimOverlay({ targetCompany, competitors, onClose }: SimOverlayPr
     }
   }, [state?.session_id, state?.current_index, state?.personas, handleEvent]);
 
+  useEffect(() => { onChooseReady?.(handleChoose); }, [handleChoose, onChooseReady]);
+
   const score = lastIteration?.score;
   const reactions = lastIteration?.reactions ?? [];
   const evidence = lastIteration?.grounding?.evidence ?? [];
 
   const highImpactCount = reactions.filter((r) => (r.intensity ?? 0) > 0.6).length;
   const allianceCount = reactions.reduce((n, r) => n + (r.ally_with?.length ?? 0), 0);
+
+  const cityMode = !!state && !loading;
+
+  if (cityMode) return null;
 
   return (
     <div style={S.overlay}>

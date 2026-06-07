@@ -40,6 +40,7 @@ class StartRequest(BaseModel):
     initial_move: str | None = None
     max_iterations: int = 10
     max_incumbents: int = 6
+    incumbents: list[str] | None = None
     seed: int | None = None
 
 
@@ -71,6 +72,7 @@ async def sim_start(req: StartRequest) -> SimulationState:
             initial_move=req.initial_move,
             max_iterations=req.max_iterations,
             max_incumbents=req.max_incumbents,
+            incumbents=req.incumbents,
             seed=req.seed,
         )
     except Exception as exc:
@@ -93,6 +95,7 @@ async def sim_start_stream(req: StartRequest):
                 initial_move=req.initial_move,
                 max_iterations=req.max_iterations,
                 max_incumbents=req.max_incumbents,
+                incumbents=req.incumbents,
                 seed=req.seed,
             ):
                 yield f"data: {json.dumps(event, default=str)}\n\n"

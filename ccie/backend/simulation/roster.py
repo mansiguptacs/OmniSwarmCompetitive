@@ -46,14 +46,28 @@ def get_sector(
     *,
     exclude: list[str] | None = None,
     max_incumbents: int = 6,
+    incumbents_override: list[str] | None = None,
 ) -> Sector:
     """Build a `Sector` for the given id, excluding the player/target names.
 
-    Falls back to the default sector when `sector_id` is unknown.
+    When *incumbents_override* is supplied, use that roster (e.g. CCIE-discovered
+    competitors) instead of the curated sector list.
     """
-    key = sector_id if sector_id in SECTOR_ROSTERS else DEFAULT_SECTOR
     excluded = {_norm(e) for e in (exclude or []) if e}
 
+    if incumbents_override:
+        incumbents = [
+            name.strip()
+            for name in incumbents_override
+            if name.strip() and _norm(name) not in excluded
+        ][:max_incumbents]
+        return Sector(
+            name="discovered_competitors",
+            incumbents=incumbents,
+            notes="Incumbents from live competitive-intelligence analysis.",
+        )
+
+    key = sector_id if sector_id in SECTOR_ROSTERS else DEFAULT_SECTOR
     incumbents = [
         name for name in SECTOR_ROSTERS[key] if _norm(name) not in excluded
     ][:max_incumbents]

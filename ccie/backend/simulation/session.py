@@ -69,6 +69,7 @@ async def start_simulation(
     initial_move: str | None = None,
     max_iterations: int = 10,
     max_incumbents: int = 6,
+    incumbents: list[str] | None = None,
     session_id: str | None = None,
     seed: int | None = None,
     store: SimulationStore | None = None,
@@ -82,6 +83,7 @@ async def start_simulation(
         sector_id,
         exclude=[player_company, target_name],
         max_incumbents=max_incumbents,
+        incumbents_override=incumbents,
     )
     personas = await build_personas(
         sector.incumbents, llm_getter=llm_getter, store=store
@@ -257,6 +259,7 @@ async def start_simulation_stream(
     initial_move: str | None = None,
     max_iterations: int = 10,
     max_incumbents: int = 6,
+    incumbents: list[str] | None = None,
     session_id: str | None = None,
     seed: int | None = None,
     store: SimulationStore | None = None,
@@ -270,6 +273,7 @@ async def start_simulation_stream(
         sector_id,
         exclude=[player_company, target_name],
         max_incumbents=max_incumbents,
+        incumbents_override=incumbents,
     )
     personas = await build_personas(
         sector.incumbents, llm_getter=llm_getter, store=store

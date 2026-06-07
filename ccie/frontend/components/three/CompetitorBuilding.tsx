@@ -5,7 +5,9 @@ import { useFrame } from "@react-three/fiber";
 import { Html, Sparkles } from "@react-three/drei";
 import * as THREE from "three";
 import type { Competitor } from "@/types/ccie";
+import type { AgentReaction } from "@/types/simulation";
 import { sizeToWidth, threatToHeight, clamp01 } from "@/lib/visuals";
+import { SimBuildingDecision } from "./SimBuildingDecision";
 
 const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
 
@@ -54,9 +56,11 @@ interface Props {
   position: [number, number];
   selected: boolean;
   onSelect: (name: string) => void;
+  simIntensity?: number;
+  simReaction?: AgentReaction;
 }
 
-export function CompetitorBuilding({ competitor, position, selected, onSelect }: Props) {
+export function CompetitorBuilding({ competitor, position, selected, onSelect, simIntensity, simReaction }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
   const currentScale = useRef(0.001);
@@ -92,15 +96,19 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
     }
 
     const s = easeOutCubic(clamp01(currentScale.current));
+    const simBoost = simIntensity ? 1 + simIntensity * 0.15 : 1;
 
     if (groupRef.current) {
-      groupRef.current.scale.set(1, Math.max(0.001, s), 1);
+      groupRef.current.scale.set(1, Math.max(0.001, s) * simBoost, 1);
     }
     if (matRef.current) {
       const base = selected ? 0.15 : hovered ? 0.08 : 0.03;
       const pulse = analyzing ? 0.08 + Math.sin(state.clock.elapsedTime * 4) * 0.06 : 0;
       const riseGlow = complete && s < 0.95 ? 0.15 * (1 - s) : 0;
-      matRef.current.emissiveIntensity = base + pulse + riseGlow;
+      const simGlow = simIntensity
+        ? 0.12 + Math.sin(state.clock.elapsedTime * 2.5) * simIntensity * 0.15
+        : 0;
+      matRef.current.emissiveIntensity = base + pulse + riseGlow + simGlow;
       matRef.current.opacity = discovering ? 0.45 : 1;
     }
   });
@@ -257,61 +265,69 @@ export function CompetitorBuilding({ competitor, position, selected, onSelect }:
         />
       )}
 
-      {/* Label — only show when building is at least partially visible */}
-      <Html
-        position={[0, topY + 1.5, 0]}
-        center
-        zIndexRange={[1, 0]}
-        style={{ pointerEvents: "auto" }}
-      >
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#2c3e50",
-          background: complete
-            ? "rgba(255,255,255,0.95)"
-            : "rgba(255,255,255,0.7)",
-          padding: "3px 10px",
-          borderRadius: 4,
-          whiteSpace: "nowrap",
-          boxShadow: complete
-            ? "0 2px 8px rgba(0,0,0,0.2)"
-            : "0 1px 4px rgba(0,0,0,0.1)",
-          borderLeft: `3px solid ${complete ? color : "#94a3b8"}`,
-          opacity: discovering ? 0.6 : 1,
-          transition: "all 0.3s",
-        }}>
-          <span style={{
-            width: 18,
-            height: 18,
-            borderRadius: 4,
-            background: complete ? color : "#94a3b8",
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: 800,
+      {/* Simulation decision card replaces label during M&A sim */}
+      {simReaction ? (
+        <SimBuildingDecision
+          reaction={simReaction}
+          buildingHeight={topY}
+          companyName={competitor.name}
+        />
+      ) : (
+        <Html
+          position={[0, topY + 1.5, 0]}
+          center
+          zIndexRange={[1, 0]}
+          style={{ pointerEvents: "auto" }}
+        >
+          <div style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
+            gap: 5,
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#2c3e50",
+            background: complete
+              ? "rgba(255,255,255,0.95)"
+              : "rgba(255,255,255,0.7)",
+            padding: "3px 10px",
+            borderRadius: 4,
+            whiteSpace: "nowrap",
+            boxShadow: complete
+              ? "0 2px 8px rgba(0,0,0,0.2)"
+              : "0 1px 4px rgba(0,0,0,0.1)",
+            borderLeft: `3px solid ${complete ? color : "#94a3b8"}`,
+            opacity: discovering ? 0.6 : 1,
+            transition: "all 0.3s",
           }}>
-            {competitor.name.charAt(0)}
-          </span>
-          {competitor.name}
-          {analyzing && (
             <span style={{
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              background: "#f59e0b",
-              animation: "pulse-glow 1.5s infinite",
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              background: complete ? color : "#94a3b8",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               flexShrink: 0,
-            }} />
-          )}
-        </div>
-      </Html>
+            }}>
+              {competitor.name.charAt(0)}
+            </span>
+            {competitor.name}
+            {analyzing && (
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: 999,
+                background: "#f59e0b",
+                animation: "pulse-glow 1.5s infinite",
+                flexShrink: 0,
+              }} />
+            )}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }

@@ -6,6 +6,7 @@ export interface StartParams {
   sector?: string;
   max_iterations?: number;
   max_incumbents?: number;
+  incumbents?: string[];
 }
 
 /** Progress events emitted by SSE streaming endpoints. */

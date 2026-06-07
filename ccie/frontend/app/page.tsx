@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useCoAgent, useCopilotChat } from "@copilotkit/react-core";
 import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
@@ -11,6 +11,9 @@ import { ActivityFeed } from "@/components/ui/ActivityFeed";
 import { DetailPanel } from "@/components/ui/DetailPanel";
 import { AnalysisToast } from "@/components/ui/AnalysisToast";
 import { SimOverlay } from "@/components/ui/SimOverlay";
+import { SimHUD } from "@/components/ui/SimHUD";
+import { SimPhaseBanner } from "@/components/ui/SimPhaseBanner";
+import type { SimulationState, AgentReaction, SimulationIteration } from "@/types/simulation";
 
 const WarRoom = dynamic(
   () => import("@/components/three/WarRoom").then((m) => m.WarRoom),
@@ -59,6 +62,9 @@ export default function HomePage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<"summary" | "detail">("summary");
   const [showSim, setShowSim] = useState(false);
+  const [simState, setSimState] = useState<SimulationState | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const simChooseRef = useRef<(choice: string) => void>(() => {});
 
   const effective: CCIEState = state ?? {};
   const competitors = effective.competitors ?? [];
@@ -93,6 +99,19 @@ export default function HomePage() {
     setDetailMode("summary");
   }, []);
 
+  const simReactions = useMemo<AgentReaction[]>(() => {
+    if (!simState?.iterations?.length) return [];
+    const last = simState.iterations[simState.iterations.length - 1];
+    return last.reactions ?? [];
+  }, [simState]);
+
+  const simLastIteration = useMemo<SimulationIteration | null>(() => {
+    if (!simState?.iterations?.length) return null;
+    return simState.iterations[simState.iterations.length - 1];
+  }, [simState]);
+
+  const simActive = showSim && !!simState && !simLoading && (simState.iterations?.length ?? 0) > 0;
+
   return (
     <main style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
       {/* Full-page 3D scene */}
@@ -102,6 +121,8 @@ export default function HomePage() {
         competitors={sceneCompetitors}
         selected={selected}
         onSelect={handleSelect}
+        simReactions={simReactions}
+        simMode={simActive}
       />
 
       {/* Top bar: search + phase */}
@@ -116,13 +137,17 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Per-company analysis toasts */}
-      <AnalysisToast competitors={competitors} activity={effective.agent_activity} phase={effective.phase} />
+      {/* Per-company analysis toasts — hidden during sim */}
+      {!simActive && (
+        <AnalysisToast competitors={competitors} activity={effective.agent_activity} phase={effective.phase} />
+      )}
 
-      {/* Bottom agent activity strip */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, pointerEvents: "none", zIndex: 20 }}>
-        <ActivityFeed activity={effective.agent_activity} phase={effective.phase} />
-      </div>
+      {/* Bottom agent activity strip — hidden during sim */}
+      {!simActive && (
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, pointerEvents: "none", zIndex: 20 }}>
+          <ActivityFeed activity={effective.agent_activity} phase={effective.phase} />
+        </div>
+      )}
 
       {/* Right detail panel */}
       <div style={{ position: "absolute", top: 92, right: 16, bottom: 140, pointerEvents: "none", zIndex: 100 }}>
@@ -134,12 +159,35 @@ export default function HomePage() {
         />
       </div>
 
-      {/* M&A War-Game Simulation overlay */}
+      {/* M&A War-Game Simulation */}
       {showSim && effective.target_company && (
         <SimOverlay
           targetCompany={effective.target_company}
           competitors={competitors.map((c) => c.name)}
-          onClose={() => setShowSim(false)}
+          onClose={() => { setShowSim(false); setSimState(null); }}
+          onStateChange={setSimState}
+          onLoadingChange={setSimLoading}
+          onChooseReady={(fn) => { simChooseRef.current = fn; }}
+        />
+      )}
+
+      {/* Phase results banner — floats over city, not at bottom */}
+      {simActive && simLastIteration && (
+        <SimPhaseBanner
+          iteration={simLastIteration}
+          phaseNum={simState!.iterations!.length}
+          maxPhases={simState!.max_iterations ?? 5}
+          targetCompany={effective.target_company || ""}
+        />
+      )}
+
+      {/* Slim HUD — controls only (decisions expand upward) */}
+      {showSim && simState && (simState.status === "awaiting_choice" || simState.status === "complete" || (simState.iterations?.length ?? 0) > 0) && (
+        <SimHUD
+          state={simState}
+          loading={simLoading}
+          onChoose={(choice) => simChooseRef.current(choice)}
+          onClose={() => { setShowSim(false); setSimState(null); }}
         />
       )}
 

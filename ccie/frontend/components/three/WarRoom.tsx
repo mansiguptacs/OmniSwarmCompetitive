@@ -9,7 +9,9 @@ import {
   Sky,
 } from "@react-three/drei";
 import type { Competitor } from "@/types/ccie";
-import { competitorPosition } from "@/lib/visuals";
+import type { AgentReaction } from "@/types/simulation";
+import { competitorPosition, threatToHeight } from "@/lib/visuals";
+import { buildReactionMap } from "@/lib/simMatch";
 import { CityGround } from "./CityGround";
 import { CompetitorBuilding } from "./CompetitorBuilding";
 import { TargetTower } from "./TargetTower";
@@ -17,6 +19,7 @@ import { Roads } from "./Roads";
 import { AgentCluster } from "./AgentCluster";
 import { SFLandmarks } from "./SFLandmarks";
 import { SFCompanyLabels } from "./SFCompanyLabels";
+import { SimEffects } from "./SimEffects";
 
 const ZOOM_IDLE = 15;
 const ZOOM_ACTIVE = 12;
@@ -56,6 +59,8 @@ interface Props {
   competitors: Competitor[];
   selected: string | null;
   onSelect: (name: string | null) => void;
+  simReactions?: AgentReaction[];
+  simMode?: boolean;
 }
 
 const CELL = 9 + 2.8;
@@ -71,7 +76,7 @@ function buildOccupiedSet(positions: [number, number][]): Set<string> {
   return set;
 }
 
-export function WarRoom({ target, hypothetical, competitors, selected, onSelect }: Props) {
+export function WarRoom({ target, hypothetical, competitors, selected, onSelect, simReactions, simMode }: Props) {
   const hasTarget = target.trim().length > 0;
 
   const threatRanks = useMemo(() => {
@@ -92,6 +97,31 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
 
   const occupiedLots = useMemo(() => buildOccupiedSet(positions), [positions]);
   const competitorNames = useMemo(() => competitors.map(c => c.name), [competitors]);
+
+  const simPositionMap = useMemo(() => {
+    const m = new Map<string, [number, number]>();
+    competitors.forEach((c, i) => { if (positions[i]) m.set(c.name, positions[i]); });
+    return m;
+  }, [competitors, positions]);
+
+  const simHeightMap = useMemo(() => {
+    const m = new Map<string, number>();
+    competitors.forEach((c) => m.set(c.name, threatToHeight(c.threat_level)));
+    return m;
+  }, [competitors]);
+
+  const simIntensityMap = useMemo(() => {
+    const m = new Map<string, number>();
+    if (simReactions) {
+      for (const r of simReactions) m.set(r.actor, r.intensity ?? 0.5);
+    }
+    return m;
+  }, [simReactions]);
+
+  const simReactionMap = useMemo(() => {
+    if (!simReactions?.length) return new Map<string, AgentReaction>();
+    return buildReactionMap(simReactions, competitorNames);
+  }, [simReactions, competitorNames]);
 
   return (
     <Canvas
@@ -151,7 +181,7 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
         />
 
         <SFLandmarks />
-        <SFCompanyLabels active={hasTarget} competitorNames={competitorNames} />
+        {!simMode && <SFCompanyLabels active={hasTarget} competitorNames={competitorNames} />}
 
         {hasTarget && positions.length > 0 && <Roads positions={positions} />}
 
@@ -165,6 +195,8 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
               position={positions[i]}
               selected={selected === c.name}
               onSelect={onSelect}
+              simIntensity={simReactionMap.get(c.name)?.intensity ?? simIntensityMap.get(c.name)}
+              simReaction={simReactionMap.get(c.name)}
             />
           ))}
 
@@ -174,6 +206,16 @@ export function WarRoom({ target, hypothetical, competitors, selected, onSelect 
               <AgentCluster key={`${c.name}-agents`} competitor={c} position={positions[i]} />
             ) : null,
           )}
+
+        {simReactions && simReactions.length > 0 && (
+          <SimEffects
+            reactions={simReactions}
+            positions={simPositionMap}
+            competitorNames={competitorNames}
+            mappedReactions={simReactionMap}
+            buildingHeights={simHeightMap}
+          />
+        )}
 
         <ContactShadows
           position={[0, 0.01, 0]}
