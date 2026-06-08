@@ -1,4 +1,4 @@
-# StrategyOS — Continuous Competitive Intelligence Engine
+# Rivalis — Continuous Competitive Intelligence Engine
 
 > **An AI-powered competitive intelligence and acquisition war-game simulator.**  
 > Enter a real company or startup idea. A swarm of specialized agents builds a live competitive landscape, analyzes market threats, and lets you simulate acquisition strategies against autonomous CEO-style digital twins of major incumbents.
@@ -7,9 +7,9 @@
 
 ---
 
-## Why StrategyOS?
+## Why Rivalis?
 
-Competitive intelligence is usually slow, manual, and outdated by the time it reaches decision-makers. StrategyOS changes that by combining:
+Competitive intelligence is usually slow, manual, and outdated by the time it reaches decision-makers. Rivalis changes that by combining:
 
 | Capability                         | Description                                              |
 | ---------------------------------- | -------------------------------------------------------- |
@@ -24,9 +24,9 @@ The result is a system that doesn't just describe the market — it helps you **
 
 ---
 
-## What StrategyOS Does
+## What Rivalis Does
 
-StrategyOS operates in two major layers.
+Rivalis operates in two major layers.
 
 ### Layer 1 — Competitive Intelligence
 
@@ -69,7 +69,7 @@ A **Market Referee** adjudicates each round and updates the board state.
 
 ## Core Agent Architecture
 
-StrategyOS uses a multi-agent architecture where each agent has a narrow, auditable responsibility — making the system more reliable, easier to evaluate, and easier to debug.
+Rivalis uses a multi-agent architecture where each agent has a narrow, auditable responsibility — making the system more reliable, easier to evaluate, and easier to debug.
 
 ### Intelligence Agents
 
@@ -143,7 +143,7 @@ flowchart TD
 
 ## Observability and Trust
 
-StrategyOS is built on the principle that **AI-generated intelligence must be auditable.**
+Rivalis is built on the principle that **AI-generated intelligence must be auditable.**
 
 The system uses **W&B Weave** as the trust and quality layer, providing:
 
@@ -227,10 +227,10 @@ Study multi-agent systems, responsible AI, agent observability, and AI-assisted 
 
 ---
 
-## What Makes StrategyOS Different?
+## What Makes Rivalis Different?
 
 Most competitive intelligence tools are dashboards.  
-**StrategyOS is an agentic simulation engine.**
+**Rivalis is an agentic simulation engine.**
 
 It doesn't only answer:
 
