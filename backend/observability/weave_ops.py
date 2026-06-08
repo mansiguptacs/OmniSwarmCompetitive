@@ -25,7 +25,7 @@ from observability.weave_config import init_weave
 # --- Fixture evaluation scorers ---
 
 
-@weave.op()
+@weave.op(name="eval_news_recency")
 def freshness_scorer(
     output: dict,
     news_items: list | None = None,
@@ -36,7 +36,7 @@ def freshness_scorer(
     return {"freshness": score_freshness(items, reference_date=ref)}
 
 
-@weave.op()
+@weave.op(name="eval_news_relevance")
 def relevance_scorer(
     output: dict,
     query: str = "",
@@ -51,13 +51,13 @@ def relevance_scorer(
     }
 
 
-@weave.op()
+@weave.op(name="eval_product_completeness")
 def product_coverage_scorer(output: dict, products: list | None = None) -> dict:
     items = products or output.get("products") or []
     return {"product_coverage": score_product_coverage(items)}
 
 
-@weave.op()
+@weave.op(name="eval_overall_quality")
 def ccie_quality_scorer(
     output: dict,
     reference_date: str = "2026-06-06",
@@ -78,7 +78,7 @@ def ccie_quality_scorer(
     return score_agent_output(merged, reference_date=date.fromisoformat(reference_date))
 
 
-@weave.op()
+@weave.op(name="eval_competitor_accuracy")
 def accuracy_scorer(
     output: dict,
     expected_competitors: list | None = None,
@@ -106,7 +106,7 @@ WEAVE_SCORERS = [
 # --- Guardrail scorers ---
 
 
-@weave.op()
+@weave.op(name="guardrail_stale_news")
 def stale_news_guardrail(
     output: dict,
     news_items: list | None = None,
@@ -121,7 +121,7 @@ def stale_news_guardrail(
     return {"stale_news_passed": result.passed, "stale_news_violations": len(result.violations)}
 
 
-@weave.op()
+@weave.op(name="guardrail_unsourced_financials")
 def financial_guardrail(
     output: dict,
     financials: dict | None = None,
@@ -142,7 +142,7 @@ def financial_guardrail(
     return {"financial_passed": result.passed, "financial_violations": len(result.violations)}
 
 
-@weave.op()
+@weave.op(name="guardrail_all_checks")
 def live_guardrail_scorer(output: dict, reference_date: str = "2026-06-06") -> dict:
     ref = date.fromisoformat(reference_date)
     report = run_live_guardrails(output, reference_date=ref)
@@ -162,17 +162,17 @@ def _summary(output: dict) -> dict:
     return output.get("summary") or {}
 
 
-@weave.op()
+@weave.op(name="live_news_recency")
 def traced_avg_freshness_scorer(output: dict) -> dict:
     return {"avg_freshness": _aggregate(output).get("avg_freshness", 0.0)}
 
 
-@weave.op()
+@weave.op(name="live_news_relevance")
 def traced_avg_relevance_scorer(output: dict) -> dict:
     return {"avg_relevance": _aggregate(output).get("avg_relevance", 0.0)}
 
 
-@weave.op()
+@weave.op(name="live_guardrails_passed")
 def traced_guardrail_scorer(output: dict) -> dict:
     agg = _aggregate(output)
     return {
@@ -181,7 +181,7 @@ def traced_guardrail_scorer(output: dict) -> dict:
     }
 
 
-@weave.op()
+@weave.op(name="live_competitor_count")
 def traced_competitor_count_scorer(output: dict) -> dict:
     summary = _summary(output)
     return {
@@ -190,17 +190,17 @@ def traced_competitor_count_scorer(output: dict) -> dict:
     }
 
 
-@weave.op()
+@weave.op(name="live_product_coverage")
 def traced_product_coverage_scorer(output: dict) -> dict:
     return {"avg_product_coverage": _aggregate(output).get("avg_product_coverage", 0.0)}
 
 
-@weave.op()
+@weave.op(name="live_swot_completeness")
 def traced_swot_completeness_scorer(output: dict) -> dict:
     return {"avg_swot_completeness": _aggregate(output).get("avg_swot_completeness", 0.0)}
 
 
-@weave.op()
+@weave.op(name="live_intel_totals")
 def traced_intel_volume_scorer(output: dict) -> dict:
     agg = _aggregate(output)
     return {
